@@ -35,12 +35,12 @@ func Test_sendData(t *testing.T) {
 func Test_rebuildData(t *testing.T) {
 	tests := []struct {
 		name    string
-		metrics Metric
+		metrics *Metric
 		want    string
 	}{
 		{
 			name: "Normal conditions",
-			metrics: Metric{
+			metrics: &Metric{
 				Alloc: 3.14159265,
 			},
 			want: "/gauge/Alloc/3.14159265",

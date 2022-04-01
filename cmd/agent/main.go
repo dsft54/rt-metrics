@@ -17,7 +17,7 @@ import (
 
 const (
 	pollInterval   time.Duration = 2 * time.Second
-	reportInterval time.Duration = 10 * time.Second
+	reportInterval time.Duration = 4 * time.Second
 )
 
 type (
@@ -55,12 +55,15 @@ type Metric struct {
 	TotalAlloc    gauge
 	PollCount     counter
 	RandomValue   gauge
+	Mutex         sync.Mutex
 }
 
 var memstats runtime.MemStats
 
 func (m *Metric) collectMemMetrics() {
 	runtime.ReadMemStats(&memstats)
+	m.Mutex.Lock()
+	defer m.Mutex.Unlock()
 	m.Alloc = gauge(memstats.Alloc)
 	m.BuckHashSys = gauge(memstats.BuckHashSys)
 	m.Frees = gauge(memstats.Frees)
@@ -92,11 +95,16 @@ func (m *Metric) collectMemMetrics() {
 	m.RandomValue = gauge(rand.Float64())
 }
 
-func rebuildData(m Metric) []string {
-	value := reflect.ValueOf(m)
+func rebuildData(m *Metric) []string {
+	m.Mutex.Lock()
+	defer m.Mutex.Unlock()
+	value := reflect.ValueOf(m).Elem()
 	typeOfS := value.Type()
 	usrlList := []string{}
 	for i := 0; i < value.NumField(); i++ {
+		if value.Field(i).Type().Name() == "Mutex" {
+			continue
+		}
 		usrlList = append(usrlList, fmt.Sprintf("/%s/%s/%v", value.Field(i).Type().Name(), typeOfS.Field(i).Name, value.Field(i).Interface()))
 	}
 	return usrlList
@@ -127,7 +135,7 @@ func reportMetrics(m *Metric, wg *sync.WaitGroup, ctx context.Context) {
 	for {
 		select {
 		case <-reportTicker.C:
-			valuesURLs := rebuildData(*m)
+			valuesURLs := rebuildData(m)
 			for _, value := range valuesURLs {
 				select {
 				case <-ctx.Done():
