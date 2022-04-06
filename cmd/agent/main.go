@@ -10,14 +10,16 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/caarlos0/env"
 	"github.com/dsft54/rt-metrics/cmd/agent/storage"
 	"github.com/go-resty/resty/v2"
 )
 
-const (
-	pollInterval   time.Duration = 2 * time.Second
-	reportInterval time.Duration = 10 * time.Second
-)
+type Config struct {
+	Address        string        `env:"ADDRESS" envDefault:"localhost:8080"`
+	PollInterval   time.Duration `env:"POLL_INTERVAL" envDefault:"2s"`
+	ReportInterval time.Duration `env:"REPORT_INTERVAL" envDefault:"10s"`
+}
 
 func sendData(url string, m *storage.Metrics) error {
 	rawData, err := json.Marshal(m)
@@ -32,9 +34,9 @@ func sendData(url string, m *storage.Metrics) error {
 	return err
 }
 
-func reportMetrics(s *storage.Storage, wg *sync.WaitGroup, ctx context.Context) {
+func reportMetrics(addr string, interval time.Duration, s *storage.Storage, wg *sync.WaitGroup, ctx context.Context) {
 	defer wg.Done()
-	reportTicker := time.NewTicker(reportInterval)
+	reportTicker := time.NewTicker(interval)
 	for {
 		select {
 		case <-reportTicker.C:
@@ -44,7 +46,7 @@ func reportMetrics(s *storage.Storage, wg *sync.WaitGroup, ctx context.Context) 
 				case <-ctx.Done():
 					return
 				default:
-					err := sendData("http://localhost:8080/update", &value)
+					err := sendData("http://"+addr+"/update", &value)
 					if err != nil {
 						continue
 					}
@@ -56,9 +58,9 @@ func reportMetrics(s *storage.Storage, wg *sync.WaitGroup, ctx context.Context) 
 	}
 }
 
-func pollMetrics(s *storage.Storage, wg *sync.WaitGroup, ctx context.Context) {
+func pollMetrics(interval time.Duration, s *storage.Storage, wg *sync.WaitGroup, ctx context.Context) {
 	defer wg.Done()
-	pollTicker := time.NewTicker(pollInterval)
+	pollTicker := time.NewTicker(interval)
 	for {
 		select {
 		case <-pollTicker.C:
@@ -70,6 +72,12 @@ func pollMetrics(s *storage.Storage, wg *sync.WaitGroup, ctx context.Context) {
 }
 
 func main() {
+	cfg := Config{}
+	err := env.Parse(&cfg)
+	if err != nil {
+		panic(err)
+	}
+
 	s := storage.Storage{}
 	wg := new(sync.WaitGroup)
 	syscallCancelChan := make(chan os.Signal, 1)
@@ -77,8 +85,8 @@ func main() {
 
 	wg.Add(2)
 	signal.Notify(syscallCancelChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
-	go pollMetrics(&s, wg, ctx)
-	go reportMetrics(&s, wg, ctx)
+	go pollMetrics(cfg.PollInterval, &s, wg, ctx)
+	go reportMetrics(cfg.Address, cfg.ReportInterval, &s, wg, ctx)
 	sig := <-syscallCancelChan
 	cancel()
 	fmt.Printf("Caught syscall: %v", sig)

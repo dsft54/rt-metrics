@@ -1,10 +1,15 @@
 package main
 
 import (
+	"github.com/caarlos0/env"
 	"github.com/dsft54/rt-metrics/cmd/server/handlers"
 	"github.com/dsft54/rt-metrics/cmd/server/storage"
 	"github.com/gin-gonic/gin"
 )
+
+type Config struct {
+	Address string `env:"ADDRESS" envDefault:"localhost:8080"`
+}
 
 func init() {
 	storage.Store = storage.MetricStorages{
@@ -14,6 +19,12 @@ func init() {
 }
 
 func main() {
+	cfg := Config{}
+	err := env.Parse(&cfg)
+	if err != nil {
+		panic(err)
+	}
+
 	// router := gin.New()
 	// router.Use(gin.Recovery())
 	router := gin.Default()
@@ -27,5 +38,5 @@ func main() {
 	router.GET("/", handlers.RootHandler)
 	router.GET("/value/:type/:name", handlers.AddressedRequest)
 
-	router.Run(":8080")
+	router.Run(cfg.Address)
 }
