@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"math/rand"
 	"reflect"
 	"runtime"
@@ -116,18 +117,17 @@ func (s *Storage) RebuildDataToJSON() []Metrics {
 	return metricsSlice
 }
 
-
-// func (m *Storage) RebuildDataToString() []string {
-// 	m.mutex.Lock()
-// 	defer m.mutex.Unlock()
-// 	value := reflect.ValueOf(m).Elem()
-// 	typeOfS := value.Type()
-// 	urlsList := []string{}
-// 	for i := 0; i < value.NumField(); i++ {
-// 		if typeOfS.Field(i).Name == "mutex" {
-// 			continue
-// 		}
-// 		urlsList = append(urlsList, fmt.Sprintf("/%s/%s/%v", value.Field(i).Type().Name(), typeOfS.Field(i).Name, value.Field(i).Interface()))
-// 	}
-// 	return urlsList
-// }
+func (m *Storage) RebuildDataToString() []string {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	value := reflect.ValueOf(m).Elem()
+	typeOfS := value.Type()
+	urlsList := []string{}
+	for i := 0; i < value.NumField(); i++ {
+		if typeOfS.Field(i).Name == "mutex" {
+			continue
+		}
+		urlsList = append(urlsList, fmt.Sprintf("/%s/%s/%v", value.Field(i).Type().Name(), typeOfS.Field(i).Name, value.Field(i).Interface()))
+	}
+	return urlsList
+}

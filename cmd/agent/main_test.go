@@ -4,11 +4,13 @@ import (
 	"testing"
 
 	"github.com/dsft54/rt-metrics/cmd/agent/storage"
+	"github.com/go-resty/resty/v2"
 )
 
 func Test_sendData(t *testing.T) {
+	client := resty.New()
 	type args struct {
-		url   string
+		url     string
 		metrics storage.Metrics
 	}
 	tests := []struct {
@@ -19,9 +21,9 @@ func Test_sendData(t *testing.T) {
 		{
 			name: "server offline (or not correct)",
 			args: args{
-				url:   "http://localhost:808",
+				url: "http://localhost:808",
 				metrics: storage.Metrics{
-					ID: "",
+					ID:    "",
 					MType: "",
 				},
 			},
@@ -30,7 +32,7 @@ func Test_sendData(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := sendData(tt.args.url, &tt.args.metrics); (err != nil) != tt.wantErr {
+			if err := sendData(tt.args.url, &tt.args.metrics, client); (err != nil) != tt.wantErr {
 				t.Errorf("sendData() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

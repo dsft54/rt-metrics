@@ -21,12 +21,11 @@ type Config struct {
 	ReportInterval time.Duration `env:"REPORT_INTERVAL" envDefault:"10s"`
 }
 
-func sendData(url string, m *storage.Metrics) error {
+func sendData(url string, m *storage.Metrics, client *resty.Client) error {
 	rawData, err := json.Marshal(m)
 	if err != nil {
 		fmt.Println(err)
 	}
-	client := resty.New()
 	_, err = client.R().
 		SetHeader("Content-Type", "application/json").
 		SetBody(rawData).
@@ -36,6 +35,7 @@ func sendData(url string, m *storage.Metrics) error {
 
 func reportMetrics(addr string, interval time.Duration, s *storage.Storage, wg *sync.WaitGroup, ctx context.Context) {
 	defer wg.Done()
+	client := resty.New()
 	reportTicker := time.NewTicker(interval)
 	for {
 		select {
@@ -46,7 +46,7 @@ func reportMetrics(addr string, interval time.Duration, s *storage.Storage, wg *
 				case <-ctx.Done():
 					return
 				default:
-					err := sendData("http://"+addr+"/update", &value)
+					err := sendData("http://"+addr+"/update", &value, client)
 					if err != nil {
 						continue
 					}

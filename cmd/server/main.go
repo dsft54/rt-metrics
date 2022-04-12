@@ -1,33 +1,38 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/caarlos0/env"
 	"github.com/dsft54/rt-metrics/cmd/server/handlers"
+	"github.com/dsft54/rt-metrics/cmd/server/settings"
 	"github.com/dsft54/rt-metrics/cmd/server/storage"
 	"github.com/gin-gonic/gin"
 )
-
-type Config struct {
-	Address string `env:"ADDRESS" envDefault:"localhost:8080"`
-}
 
 func init() {
 	storage.Store = storage.MetricStorages{
 		GaugeMetrics:   make(map[string]float64),
 		CounterMetrics: make(map[string]int64),
 	}
+	err := env.Parse(&settings.Cfg)
+	if err != nil {
+		fmt.Println(err)
+	}
+	err = storage.FileStore.InitFileStorage(settings.Cfg)
+	if err != nil {
+		fmt.Println(err)
+	}
 }
 
 func main() {
-	cfg := Config{}
-	err := env.Parse(&cfg)
-	if err != nil {
-		panic(err)
+	if !storage.FileStore.Synchronize {
+		go storage.FileStore.IntervalUpdate(settings.Cfg.StoreInterval)
 	}
 
-	// router := gin.New()
-	// router.Use(gin.Recovery())
-	router := gin.Default()
+	router := gin.New()
+	router.Use(gin.Recovery())
+	// router := gin.Default()
 
 	// router.POST("/update/:type/:name/:value", handlers.UpdatesHandler)
 	router.POST("/update/gauge/", handlers.WithoutID)
@@ -38,5 +43,5 @@ func main() {
 	router.GET("/", handlers.RootHandler)
 	router.GET("/value/:type/:name", handlers.AddressedRequest)
 
-	router.Run(cfg.Address)
+	router.Run(settings.Cfg.Address)
 }
