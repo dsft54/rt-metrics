@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -11,15 +12,10 @@ import (
 	"time"
 
 	"github.com/caarlos0/env"
+	"github.com/dsft54/rt-metrics/cmd/agent/settings"
 	"github.com/dsft54/rt-metrics/cmd/agent/storage"
 	"github.com/go-resty/resty/v2"
 )
-
-type Config struct {
-	Address        string        `env:"ADDRESS" envDefault:"localhost:8080"`
-	PollInterval   time.Duration `env:"POLL_INTERVAL" envDefault:"2s"`
-	ReportInterval time.Duration `env:"REPORT_INTERVAL" envDefault:"10s"`
-}
 
 func sendData(url string, m *storage.Metrics, client *resty.Client) error {
 	rawData, err := json.Marshal(m)
@@ -71,22 +67,27 @@ func pollMetrics(interval time.Duration, s *storage.Storage, wg *sync.WaitGroup,
 	}
 }
 
-func main() {
-	cfg := Config{}
-	err := env.Parse(&cfg)
+func init() {
+	err := env.Parse(&settings.Cfg)
 	if err != nil {
 		panic(err)
 	}
+	flag.StringVar(&settings.Cfg.Address,"a", settings.Cfg.Address, "Metrics server address")
+	flag.DurationVar(&settings.Cfg.PollInterval, "p", settings.Cfg.PollInterval, "Runtime poll interval")
+	flag.DurationVar(&settings.Cfg.ReportInterval, "r", settings.Cfg.ReportInterval, "Report metrics interval")
+}
 
+func main() {
+	flag.Parse()
 	s := storage.Storage{}
 	wg := new(sync.WaitGroup)
 	syscallCancelChan := make(chan os.Signal, 1)
 	ctx, cancel := context.WithCancel(context.Background())
-
 	wg.Add(2)
+
 	signal.Notify(syscallCancelChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
-	go pollMetrics(cfg.PollInterval, &s, wg, ctx)
-	go reportMetrics(cfg.Address, cfg.ReportInterval, &s, wg, ctx)
+	go pollMetrics(settings.Cfg.PollInterval, &s, wg, ctx)
+	go reportMetrics(settings.Cfg.Address, settings.Cfg.ReportInterval, &s, wg, ctx)
 	sig := <-syscallCancelChan
 	cancel()
 	fmt.Printf("Caught syscall: %v", sig)

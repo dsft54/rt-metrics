@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func RootHandler(c *gin.Context) {	
+func RootHandler(c *gin.Context) {
 	c.String(http.StatusOK, "Gauge metrics: %+v\n, Counter metrics: %+v\n", storage.Store.GaugeMetrics, storage.Store.CounterMetrics)
 }
 
@@ -76,13 +76,13 @@ func HandleUpdateJSON(c *gin.Context) {
 	}
 	if storage.FileStore.Synchronize {
 		err := storage.FileStore.OpenToWrite()
-		if err != nil{
+		if err != nil {
 			return
 		}
 		storage.Store.WriteMetricsToFile(storage.FileStore.File)
 		storage.FileStore.File.Close()
 	}
-	c.Status(http.StatusOK)	
+	c.Status(http.StatusOK)
 }
 
 func WithoutID(c *gin.Context) {
