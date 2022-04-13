@@ -2,8 +2,10 @@ package storage
 
 import (
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -21,6 +23,29 @@ type MetricStorages struct {
 	GaugeMetrics   map[string]float64
 	CounterMetrics map[string]int64
 	mutex          sync.Mutex
+}
+
+func (m *MetricStorages) UpdateMetricsFromString(metricType, metricName, metricValue string) (int, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	switch metricType {
+	case "gauge":
+		floatFromString, err := strconv.ParseFloat(metricValue, 64)
+		if err != nil {
+			return 400, err
+		}
+		m.GaugeMetrics[metricName] = floatFromString
+		return 200, nil
+	case "counter":
+		intFromString, err := strconv.Atoi(metricValue)
+		if err != nil {
+			return 400, err
+		}
+		m.CounterMetrics[metricName] += int64(intFromString)
+		return 200, nil
+	default:
+		return 501, errors.New("wrong metric type - " + metricType)
+	}
 }
 
 func (m *MetricStorages) ReadOldMetrics() error {

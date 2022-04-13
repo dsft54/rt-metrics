@@ -9,6 +9,25 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+
+func StringUpdatesHandler(c *gin.Context) {
+	mType := c.Param("type")
+	mName := c.Param("name")
+	mValue := c.Param("value")
+	code, err := storage.Store.UpdateMetricsFromString(mType, mName, mValue)
+	if err != nil {
+		fmt.Println(err, "Type:", mType, "Name:", mName, "Value:", mValue)
+	}
+	switch code {
+	case 200:
+		c.Status(http.StatusOK)
+	case 400:
+		c.Status(http.StatusBadRequest)
+	case 501:
+		c.Status(http.StatusNotImplemented)
+	}
+}
+
 func RootHandler(c *gin.Context) {
 	c.String(http.StatusOK, "Gauge metrics: %+v\n, Counter metrics: %+v\n", storage.Store.GaugeMetrics, storage.Store.CounterMetrics)
 }

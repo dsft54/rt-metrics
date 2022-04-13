@@ -43,7 +43,7 @@ func main() {
 	router.Use(gin.Recovery(), handlers.Decompression(), handlers.Compression())
 	// router := gin.Default()
 
-	// router.POST("/update/:type/:name/:value", handlers.UpdatesHandler)
+	router.POST("/update/:type/:name/:value", handlers.StringUpdatesHandler)
 	router.POST("/update/gauge/", handlers.WithoutID)
 	router.POST("/update/counter/", handlers.WithoutID)
 	router.POST("/update", handlers.HandleUpdateJSON)
