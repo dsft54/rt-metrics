@@ -117,10 +117,10 @@ func (s *Storage) RebuildDataToJSON() []Metrics {
 	return metricsSlice
 }
 
-func (m *Storage) RebuildDataToString() []string {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	value := reflect.ValueOf(m).Elem()
+func (s *Storage) RebuildDataToString() []string {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	value := reflect.ValueOf(s).Elem()
 	typeOfS := value.Type()
 	urlsList := []string{}
 	for i := 0; i < value.NumField(); i++ {

@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
@@ -48,16 +49,15 @@ func (m *MetricStorages) UpdateMetricsFromString(metricType, metricName, metricV
 	}
 }
 
-func (m *MetricStorages) ReadOldMetrics() error {
+func (m *MetricStorages) ReadOldMetrics(path string) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	var metricsSlice []Metrics
 
-	data, err := ioutil.ReadFile(settings.Cfg.StoreFile)
+	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return err
 	}
-
 	err = json.Unmarshal(data, &metricsSlice)
 	if err != nil {
 		return err
@@ -66,9 +66,9 @@ func (m *MetricStorages) ReadOldMetrics() error {
 	for _, val := range metricsSlice {
 		switch val.MType {
 		case "gauge":
-			Store.GaugeMetrics[val.ID] = *val.Value
+			m.GaugeMetrics[val.ID] = *val.Value
 		case "counter":
-			Store.CounterMetrics[val.ID] = *val.Delta
+			m.CounterMetrics[val.ID] += *val.Delta
 		}
 	}
 	return nil
@@ -94,7 +94,7 @@ func (m *MetricStorages) WriteMetricsToFile(file *os.File) error {
 			Delta: &v,
 		})
 	}
-	data, err := json.MarshalIndent(metricsSlice, "", "")
+	data, err := json.Marshal(metricsSlice)
 	if err != nil {
 		return err
 	}
@@ -107,6 +107,7 @@ func (m *MetricStorages) WriteMetricsToFile(file *os.File) error {
 
 type FileStorage struct {
 	File        *os.File
+	StoreData   bool
 	Synchronize bool
 }
 
@@ -119,9 +120,19 @@ func (f *FileStorage) OpenToWrite() error {
 	return nil
 }
 
-func (f *FileStorage) InitFileStorage(cfg settings.Config) error {
+func (f *FileStorage) InitFileStorage(cfg settings.Config, s *MetricStorages) error {
+	if cfg.StoreFile == "" {
+		f.StoreData = false
+		f.Synchronize = false
+		return nil
+	} else {
+		f.StoreData = true
+	}
 	if cfg.Restore {
-		Store.ReadOldMetrics()
+		err := s.ReadOldMetrics(cfg.StoreFile)
+		if err != nil {
+			return err
+		}
 	}
 	if cfg.StoreInterval == 0 {
 		f.Synchronize = true
@@ -132,13 +143,17 @@ func (f *FileStorage) InitFileStorage(cfg settings.Config) error {
 	return nil
 }
 
-func (f *FileStorage) IntervalUpdate(dur time.Duration) {
+func (f *FileStorage) IntervalUpdate(dur time.Duration, s *MetricStorages, ctx context.Context) {
 	intervalTicker := time.NewTicker(dur)
 	for {
-		<-intervalTicker.C
-		f.OpenToWrite()
-		Store.WriteMetricsToFile(f.File)
-		f.File.Close()
+		select {
+		case <-intervalTicker.C:
+			f.OpenToWrite()
+			s.WriteMetricsToFile(f.File)
+			f.File.Close()
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 
