@@ -11,22 +11,30 @@ import (
 	"time"
 
 	"github.com/caarlos0/env"
+	"github.com/gin-gonic/gin"
+
 	"github.com/dsft54/rt-metrics/cmd/server/handlers"
 	"github.com/dsft54/rt-metrics/cmd/server/settings"
 	"github.com/dsft54/rt-metrics/cmd/server/storage"
-	"github.com/gin-gonic/gin"
+)
+
+var (
+	config    settings.Config
+	memstore  storage.MetricStorages
+	filestore storage.FileStorage
 )
 
 func init() {
-	storage.Store = storage.MetricStorages{
+	memstore = storage.MetricStorages{
 		GaugeMetrics:   make(map[string]float64),
 		CounterMetrics: make(map[string]int64),
 	}
 
-	flag.StringVar(&settings.Cfg.Address, "a", "localhost:8080", "Server address")
-	flag.BoolVar(&settings.Cfg.Restore, "r", true, "Restore metrics from file on start")
-	flag.StringVar(&settings.Cfg.StoreFile, "f", "/tmp/devops-metrics-db.json", "Path to file storage")
-	flag.DurationVar(&settings.Cfg.StoreInterval, "i", 300*time.Second, "Update file storage interval")
+	flag.StringVar(&config.Address, "a", "localhost:8080", "Server address")
+	flag.BoolVar(&config.Restore, "r", true, "Restore metrics from file on start")
+	flag.StringVar(&config.StoreFile, "f", "/tmp/devops-metrics-db.json", "Path to file storage")
+	flag.DurationVar(&config.StoreInterval, "i", 300*time.Second, "Update file storage interval")
+	flag.StringVar(&config.HashKey, "k", "", "SHA256 signing key")
 }
 
 func setupGinHandlers() *gin.Engine {
@@ -38,61 +46,61 @@ func setupGinHandlers() *gin.Engine {
 		gin.Logger(),
 	)
 
-	router.GET("/", handlers.RootHandler)
-	router.GET("/value/:type/:name", handlers.AddressedRequest)
-	router.POST("/update/", handlers.HandleUpdateJSON)
-	router.POST("/value/", handlers.HandleRequestJSON)
+	router.GET("/", handlers.RootHandler(&memstore))
+	router.GET("/value/:type/:name", handlers.AddressedRequest(&memstore))
+	router.POST("/update/", handlers.HandleUpdateJSON(&filestore, &memstore, config.HashKey))
+	router.POST("/value/", handlers.HandleRequestJSON(&memstore, config.HashKey))
 	router.POST("/update/gauge/", handlers.WithoutID)
 	router.POST("/update/counter/", handlers.WithoutID)
-	router.POST("/update/:type/:name/:value", handlers.StringUpdatesHandler)
+	router.POST("/update/:type/:name/:value", handlers.StringUpdatesHandler(&filestore, &memstore))
 
 	return router
 }
 
 func main() {
+	syscallCancelChan := make(chan os.Signal, 1)
 	flag.Parse()
-	err := env.Parse(&settings.Cfg)
+	err := env.Parse(&config)
 	if err != nil {
 		log.Println(err)
 	}
-	err = storage.FileStore.InitFileStorage(settings.Cfg, &storage.Store)
-	if err != nil {
-		log.Println(err, " - file specified for restoring metrics was not found")
+	filestore.InitFileStorage(config)
+
+	if config.Restore {
+		err := memstore.ReadOldMetrics(filestore.FilePath)
+		if err != nil {
+			log.Println("Wanted to restore old metrics from file on server start but failed; ", err)
+		}
 	}
-	syscallCancelChan := make(chan os.Signal, 1)
+
 	ctx, cancel := context.WithCancel(context.Background())
-	if storage.FileStore.StoreData && !storage.FileStore.Synchronize {
-		go storage.FileStore.IntervalUpdate(settings.Cfg.StoreInterval, &storage.Store, ctx)
+	defer cancel()
+	if filestore.StoreData && !filestore.Synchronize {
+		go filestore.IntervalUpdate(ctx, config.StoreInterval, &memstore)
 	}
 
 	router := setupGinHandlers()
 	server := &http.Server{
-		Addr:    settings.Cfg.Address,
+		Addr:    config.Address,
 		Handler: router,
 	}
 	go func() {
 		err := server.ListenAndServe()
 		if err != nil {
-			log.Printf("\nListen: %s\n", err)
+			log.Println("Listen: ", err)
 		}
 	}()
 
 	signal.Notify(syscallCancelChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	sig := <-syscallCancelChan
-	defer cancel()
-	log.Printf("\nCaught syscall: %v\n", sig)
+	log.Println("Caught syscall: ", sig)
 	if err := server.Shutdown(ctx); err != nil {
 		log.Fatal("Server Shutdown:", err)
 	}
 	log.Println("Server exiting")
 
-	if storage.FileStore.StoreData {
-		err := storage.FileStore.OpenToWrite()
-		if err != nil {
-			log.Println("Failed to save data on exit")
-		}
-		storage.Store.WriteMetricsToFile(storage.FileStore.File)
-		storage.FileStore.File.Close()
-		log.Println("Data was saved")
+	err = filestore.SaveDataToFile(filestore.StoreData, &memstore)
+	if err != nil {
+		log.Println("Failed to save data on server exit;", err)
 	}
 }

@@ -2,9 +2,10 @@ package main
 
 import (
 	"testing"
+	
+	"github.com/go-resty/resty/v2"
 
 	"github.com/dsft54/rt-metrics/cmd/agent/storage"
-	"github.com/go-resty/resty/v2"
 )
 
 func Test_sendData(t *testing.T) {

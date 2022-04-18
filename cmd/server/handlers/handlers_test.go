@@ -7,13 +7,15 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/dsft54/rt-metrics/cmd/server/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/dsft54/rt-metrics/cmd/server/storage"
 )
 
 func TestAddressedRequest(t *testing.T) {
-	storage.Store.GaugeMetrics = map[string]float64{"Alloc": 3.14159265}
+	testStore := storage.MetricStorages{}
+	testStore.GaugeMetrics = map[string]float64{"Alloc": 3.14159265}
 	tests := []struct {
 		name   string
 		method string
@@ -43,7 +45,7 @@ func TestAddressedRequest(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
 			_, r := gin.CreateTestContext(w)
-			r.GET("/value/:type/:name", AddressedRequest)
+			r.GET("/value/:type/:name", AddressedRequest(&testStore))
 			req, _ := http.NewRequest(tt.method, tt.url, nil)
 			r.ServeHTTP(w, req)
 			assert.Equal(t, tt.code, w.Code)
@@ -52,6 +54,10 @@ func TestAddressedRequest(t *testing.T) {
 }
 
 func TestHandleRequestJSON(t *testing.T) {
+	testStore := storage.MetricStorages{
+		GaugeMetrics:   make(map[string]float64),
+		CounterMetrics: make(map[string]int64),
+	}
 	tests := []struct {
 		name         string
 		request      storage.Metrics
@@ -88,7 +94,7 @@ func TestHandleRequestJSON(t *testing.T) {
 
 			w := httptest.NewRecorder()
 			_, r := gin.CreateTestContext(w)
-			r.POST("/value", HandleRequestJSON)
+			r.POST("/value", HandleRequestJSON(&testStore, ""))
 
 			dataReq, err := json.Marshal(tt.request)
 			if err != nil {
@@ -118,9 +124,13 @@ func TestHandleRequestJSON(t *testing.T) {
 }
 
 func TestHandleUpdateJSON(t *testing.T) {
-	storage.Store = storage.MetricStorages{
+	testStore := storage.MetricStorages{
 		GaugeMetrics:   make(map[string]float64),
 		CounterMetrics: make(map[string]int64),
+	}
+	testFileStore := storage.FileStorage{
+		Synchronize: false,
+		StoreData:   false,
 	}
 	tests := []struct {
 		name    string
@@ -159,7 +169,7 @@ func TestHandleUpdateJSON(t *testing.T) {
 
 			w := httptest.NewRecorder()
 			_, r := gin.CreateTestContext(w)
-			r.POST("/update", HandleUpdateJSON)
+			r.POST("/update", HandleUpdateJSON(&testFileStore, &testStore, ""))
 
 			if tt.request.MType == "gauge" {
 				tt.request.Value = &tt.valueG
@@ -175,8 +185,8 @@ func TestHandleUpdateJSON(t *testing.T) {
 			req, _ := http.NewRequest("POST", "/update", bytes.NewBuffer(dataReq))
 			r.ServeHTTP(w, req)
 
-			assert.Equal(t, storage.Store.GaugeMetrics[tt.request.ID], tt.wantG)
-			assert.Equal(t, storage.Store.CounterMetrics[tt.request.ID], tt.wantC)
+			assert.Equal(t, testStore.GaugeMetrics[tt.request.ID], tt.wantG)
+			assert.Equal(t, testStore.CounterMetrics[tt.request.ID], tt.wantC)
 			assert.Equal(t, tt.code, w.Code)
 		})
 	}

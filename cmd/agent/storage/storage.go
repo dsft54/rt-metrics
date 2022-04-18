@@ -1,6 +1,9 @@
 package storage
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -14,10 +17,11 @@ type (
 )
 
 type Metrics struct {
-	ID    string   `json:"id"`
-	MType string   `json:"type"`
-	Delta *int64   `json:"delta,omitempty"`
-	Value *float64 `json:"value,omitempty"`
+	ID    string   `json:"id"`              // имя метрики
+	MType string   `json:"type"`            // параметр, принимающий значение gauge или counter
+	Delta *int64   `json:"delta,omitempty"` // значение метрики в случае передачи counter
+	Value *float64 `json:"value,omitempty"` // значение метрики в случае передачи gauge
+	Hash  string   `json:"hash,omitempty"`  // значение хеш-функции
 }
 
 type Storage struct {
@@ -90,10 +94,15 @@ func (s *Storage) CollectMemMetrics() {
 	s.RandomValue = gauge(rand.Float64())
 }
 
-func (s *Storage) RebuildDataToJSON() []Metrics {
+func signMessageHmac(key, message string) []byte {
+
+	return nil
+}
+
+func (s *Storage) RebuildDataToJSON(hkey string) []Metrics {
+	metricsSlice := []Metrics{}
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	metricsSlice := []Metrics{}
 	value := reflect.ValueOf(s).Elem()
 	typeOfS := value.Type()
 	for i := 0; i < value.NumField(); i++ {
@@ -101,17 +110,27 @@ func (s *Storage) RebuildDataToJSON() []Metrics {
 			continue
 		}
 		metricsPart := Metrics{}
+		metricsPart.ID = typeOfS.Field(i).Name
 		if value.Field(i).Type().Name() == "gauge" {
 			metricsPart.MType = value.Field(i).Type().Name()
 			v := float64(value.Field(i).Interface().(gauge))
 			metricsPart.Value = &v
+			if hkey != "" {
+				h := hmac.New(sha256.New, []byte(hkey))
+				h.Write([]byte(fmt.Sprintf("%s:gauge:%f", metricsPart.ID, v)))
+				metricsPart.Hash = hex.EncodeToString(h.Sum(nil))
+			}
 		}
 		if value.Field(i).Type().Name() == "counter" {
 			metricsPart.MType = value.Field(i).Type().Name()
-			v := int64(value.Field(i).Interface().(counter))
-			metricsPart.Delta = &v
+			d := int64(value.Field(i).Interface().(counter))
+			metricsPart.Delta = &d
+			if hkey != "" {
+				h := hmac.New(sha256.New, []byte(hkey))
+				h.Write([]byte(fmt.Sprintf("%s:counter:%d", metricsPart.ID, d)))
+				metricsPart.Hash = hex.EncodeToString(h.Sum(nil))
+			}
 		}
-		metricsPart.ID = typeOfS.Field(i).Name
 		metricsSlice = append(metricsSlice, metricsPart)
 	}
 	return metricsSlice
