@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx"
+
 	"github.com/dsft54/rt-metrics/cmd/server/settings"
 )
 
@@ -21,13 +23,13 @@ type Metrics struct {
 	Hash  string   `json:"hash,omitempty"`  // значение хеш-функции
 }
 
-type MetricStorages struct {
+type MemoryStorage struct {
 	GaugeMetrics   map[string]float64 // хранилище для gauge
 	CounterMetrics map[string]int64   // хранилище для counter
 	mutex          sync.Mutex
 }
 
-func (m *MetricStorages) UpdateMetricsFromString(metricType, metricName, metricValue string) (int, error) {
+func (m *MemoryStorage) UpdateMetricsFromString(metricType, metricName, metricValue string) (int, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	switch metricType {
@@ -50,7 +52,7 @@ func (m *MetricStorages) UpdateMetricsFromString(metricType, metricName, metricV
 	}
 }
 
-func (m *MetricStorages) ReadOldMetrics(path string) error {
+func (m *MemoryStorage) ReadOldMetrics(path string) error {
 	var metricsSlice []Metrics
 
 	m.mutex.Lock()
@@ -75,7 +77,7 @@ func (m *MetricStorages) ReadOldMetrics(path string) error {
 	return nil
 }
 
-func (m *MetricStorages) WriteMetricsToFile(file *os.File) error {
+func (m *MemoryStorage) WriteMetricsToFile(file *os.File) error {
 	var metricsSlice []Metrics
 
 	m.mutex.Lock()
@@ -124,7 +126,7 @@ func (f *FileStorage) OpenToWrite(path string) error {
 	return nil
 }
 
-func (f *FileStorage) SaveDataToFile(condition bool, m *MetricStorages) error {
+func (f *FileStorage) SaveDataToFile(condition bool, m *MemoryStorage) error {
 	if condition {
 		err := f.OpenToWrite(f.FilePath)
 		if err != nil {
@@ -137,7 +139,7 @@ func (f *FileStorage) SaveDataToFile(condition bool, m *MetricStorages) error {
 }
 
 func (f *FileStorage) InitFileStorage(cfg settings.Config) {
-	if cfg.StoreFile == "" {
+	if cfg.StoreFile == "" || cfg.DatabaseDSN != "" {
 		f.StoreData = false
 		f.Synchronize = false
 	} else {
@@ -152,7 +154,7 @@ func (f *FileStorage) InitFileStorage(cfg settings.Config) {
 	}
 }
 
-func (f *FileStorage) IntervalUpdate(ctx context.Context, dur time.Duration, s *MetricStorages) {
+func (f *FileStorage) IntervalUpdate(ctx context.Context, dur time.Duration, s *MemoryStorage) {
 	intervalTicker := time.NewTicker(dur)
 	for {
 		select {
@@ -164,4 +166,35 @@ func (f *FileStorage) IntervalUpdate(ctx context.Context, dur time.Duration, s *
 			return
 		}
 	}
+}
+
+type DBStorage struct {
+	Connection *pgx.Conn
+	ConnConfig pgx.ConnConfig
+	Context    context.Context
+}
+
+func (d *DBStorage) Ping() error {
+	err := d.Connection.Ping(d.Context)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (d *DBStorage) SetupDBStorage(auth string, ctx context.Context) error {
+	var err error
+	if auth == "" {
+		return nil
+	}
+	d.ConnConfig, err = pgx.ParseConnectionString(auth)
+	if err != nil {
+		return errors.New("DB auth uri parse failed")
+	}
+	d.Connection, err = pgx.Connect(d.ConnConfig)
+	if err != nil {
+		return errors.New("WARNING! DB connection failed")
+	}
+	d.Context = ctx
+	return nil
 }

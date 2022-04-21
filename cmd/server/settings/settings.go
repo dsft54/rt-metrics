@@ -8,6 +8,5 @@ type Config struct {
 	StoreFile     string        `env:"STORE_FILE"`
 	Restore       bool          `env:"RESTORE"`
 	HashKey       string        `env:"KEY"`
+	DatabaseDSN   string        `env:"DATABASE_DSN"`
 }
-
-var Cfg Config

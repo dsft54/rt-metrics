@@ -14,7 +14,7 @@ import (
 )
 
 func TestAddressedRequest(t *testing.T) {
-	testStore := storage.MetricStorages{}
+	testStore := storage.MemoryStorage{}
 	testStore.GaugeMetrics = map[string]float64{"Alloc": 3.14159265}
 	tests := []struct {
 		name   string
@@ -54,7 +54,7 @@ func TestAddressedRequest(t *testing.T) {
 }
 
 func TestHandleRequestJSON(t *testing.T) {
-	testStore := storage.MetricStorages{
+	testStore := storage.MemoryStorage{
 		GaugeMetrics:   make(map[string]float64),
 		CounterMetrics: make(map[string]int64),
 	}
@@ -124,7 +124,7 @@ func TestHandleRequestJSON(t *testing.T) {
 }
 
 func TestHandleUpdateJSON(t *testing.T) {
-	testStore := storage.MetricStorages{
+	testStore := storage.MemoryStorage{
 		GaugeMetrics:   make(map[string]float64),
 		CounterMetrics: make(map[string]int64),
 	}

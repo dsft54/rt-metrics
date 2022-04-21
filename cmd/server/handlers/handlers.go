@@ -14,7 +14,7 @@ import (
 	"github.com/dsft54/rt-metrics/cmd/server/storage"
 )
 
-func StringUpdatesHandler(fs *storage.FileStorage, st *storage.MetricStorages) gin.HandlerFunc {
+func StringUpdatesHandler(fs *storage.FileStorage, st *storage.MemoryStorage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		mType := c.Param("type")
 		mName := c.Param("name")
@@ -40,7 +40,7 @@ func StringUpdatesHandler(fs *storage.FileStorage, st *storage.MetricStorages) g
 	}
 }
 
-func AddressedRequest(st *storage.MetricStorages) gin.HandlerFunc {
+func AddressedRequest(st *storage.MemoryStorage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		mType := c.Param("type")
 		mName := c.Param("name")
@@ -66,7 +66,7 @@ func AddressedRequest(st *storage.MetricStorages) gin.HandlerFunc {
 	}
 }
 
-func HandleRequestJSON(st *storage.MetricStorages, key string) gin.HandlerFunc {
+func HandleRequestJSON(st *storage.MemoryStorage, key string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rawData, err := c.GetRawData()
 		if err != nil {
@@ -99,7 +99,7 @@ func HandleRequestJSON(st *storage.MetricStorages, key string) gin.HandlerFunc {
 	}
 }
 
-func HandleUpdateJSON(fs *storage.FileStorage, st *storage.MetricStorages, key string) gin.HandlerFunc {
+func HandleUpdateJSON(fs *storage.FileStorage, st *storage.MemoryStorage, key string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rawData, err := c.GetRawData()
 		if err != nil {
@@ -146,11 +146,26 @@ func HandleUpdateJSON(fs *storage.FileStorage, st *storage.MetricStorages, key s
 	}
 }
 
+func PingDB(dbs *storage.DBStorage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if dbs.Connection == nil {
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		err := dbs.Ping()
+		if err != nil {
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		c.Status(http.StatusOK)
+	}
+}
+
 func WithoutID(c *gin.Context) {
 	c.Status(http.StatusNotFound)
 }
 
-func RootHandler(st *storage.MetricStorages) gin.HandlerFunc {
+func RootHandler(st *storage.MemoryStorage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(fmt.Sprintf("Gauge metrics: %+v\n, Counter metrics: %+v\n", st.GaugeMetrics, st.CounterMetrics)))
 	}
