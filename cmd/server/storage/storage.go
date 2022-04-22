@@ -139,7 +139,7 @@ func (f *FileStorage) SaveDataToFile(condition bool, m *MemoryStorage) error {
 }
 
 func (f *FileStorage) InitFileStorage(cfg settings.Config) {
-	if cfg.StoreFile == "" || cfg.DatabaseDSN != "" {
+	if cfg.StoreFile == "" {
 		f.StoreData = false
 		f.Synchronize = false
 	} else {
@@ -150,6 +150,9 @@ func (f *FileStorage) InitFileStorage(cfg settings.Config) {
 		f.Synchronize = true
 	}
 	if cfg.StoreInterval > 0 {
+		f.Synchronize = false
+	}
+	if cfg.DatabaseDSN != "" {
 		f.Synchronize = false
 	}
 }

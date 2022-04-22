@@ -87,7 +87,7 @@ func main() {
 			log.Println("Wanted to restore old metrics from file on server start but failed; ", err)
 		}
 	}
-	if filestore.StoreData && !filestore.Synchronize {
+	if filestore.StoreData && !filestore.Synchronize && config.DatabaseDSN == "" {
 		go filestore.IntervalUpdate(ctx, config.StoreInterval, &memstore)
 	}
 
