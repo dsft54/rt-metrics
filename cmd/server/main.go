@@ -36,7 +36,7 @@ func init() {
 	flag.StringVar(&config.StoreFile, "f", "/tmp/devops-metrics-db.json", "Path to file storage")
 	flag.DurationVar(&config.StoreInterval, "i", 300*time.Second, "Update file storage interval")
 	flag.StringVar(&config.HashKey, "k", "", "SHA256 signing key")
-	flag.StringVar(&config.DatabaseDSN, "d", "postgres://postgres:example@localhost:5432/postgres", "Postgress connection uri")
+	flag.StringVar(&config.DatabaseDSN, "d", "", "Postgress connection uri")
 }
 
 func setupGinHandlers() *gin.Engine {
