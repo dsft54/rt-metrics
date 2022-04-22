@@ -70,6 +70,7 @@ func main() {
 	if err != nil {
 		log.Println(err)
 	}
+	log.Println("Running config - ", config)
 	// Init file and db storages
 	filestore.InitFileStorage(config)
 	err = dbstore.SetupDBStorage(config.DatabaseDSN, ctx)
