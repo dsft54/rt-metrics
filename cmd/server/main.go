@@ -64,6 +64,7 @@ func main() {
 	// Init syscall chanel, ctx, parse flags and os vars
 	syscallCancelChan := make(chan os.Signal, 1)
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	flag.Parse()
 	err := env.Parse(&config)
 	if err != nil {
@@ -75,7 +76,9 @@ func main() {
 	if err != nil {
 		log.Println("DB: ", err)
 	}
-	defer dbstore.Connection.Close()
+	if dbstore.Connection != nil {
+		defer dbstore.Connection.Close()
+	}
 	// Handle file interaction if neccesary
 	if config.Restore {
 		err := memstore.ReadOldMetrics(filestore.FilePath)
@@ -106,7 +109,6 @@ func main() {
 		log.Fatal("Server Shutdown:", err)
 	}
 	log.Println("Server exiting")
-	cancel()
 	err = filestore.SaveDataToFile(filestore.StoreData, &memstore)
 	if err != nil {
 		log.Println("Failed to save data on server exit;", err)
