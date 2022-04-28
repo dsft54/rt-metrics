@@ -33,10 +33,10 @@ func init() {
 
 	flag.StringVar(&config.Address, "a", "localhost:8080", "Server address")
 	flag.BoolVar(&config.Restore, "r", true, "Restore metrics from file on start")
-	flag.StringVar(&config.StoreFile, "f", "/tmp/devops-metrics-db.json", "Path to file storage")
+	flag.StringVar(&config.StoreFile, "f", "devops-metrics-db.json", "Path to file storage")
 	flag.DurationVar(&config.StoreInterval, "i", 300*time.Second, "Update file storage interval")
 	flag.StringVar(&config.HashKey, "k", "", "SHA256 signing key")
-	flag.StringVar(&config.DatabaseDSN, "d", "", "Postgress connection uri")
+	flag.StringVar(&config.DatabaseDSN, "d", "postgres://postgres:example@localhost:5432", "Postgress connection uri")
 }
 
 func setupGinHandlers() *gin.Engine {
@@ -48,14 +48,22 @@ func setupGinHandlers() *gin.Engine {
 		gin.Logger(),
 	)
 
-	router.GET("/", handlers.RootHandler(&memstore))
+	if dbstore.Connection != nil {
+		router.GET("/", handlers.DBRootHandler(&dbstore))
+		router.GET("/value/:type/:name", handlers.DBAddressedRequest(&dbstore))
+		router.POST("/update/", handlers.DBHandleUpdateJSON(&dbstore, &filestore, config.HashKey))
+		router.POST("/value/", handlers.DBHandleRequestJSON(&dbstore, config.HashKey))
+		router.POST("/update/:type/:name/:value", handlers.DBStringUpdatesHandler(&dbstore, &filestore))
+	} else {
+		router.GET("/", handlers.RootHandler(&memstore))
+		router.GET("/value/:type/:name", handlers.AddressedRequest(&memstore))
+		router.POST("/update/", handlers.HandleUpdateJSON(&memstore, &filestore, config.HashKey))
+		router.POST("/value/", handlers.HandleRequestJSON(&memstore, config.HashKey))
+		router.POST("/update/:type/:name/:value", handlers.StringUpdatesHandler(&memstore, &filestore))
+	}
 	router.GET("/ping", handlers.PingDB(&dbstore))
-	router.GET("/value/:type/:name", handlers.AddressedRequest(&memstore))
-	router.POST("/update/", handlers.HandleUpdateJSON(&filestore, &memstore, config.HashKey))
-	router.POST("/value/", handlers.HandleRequestJSON(&memstore, config.HashKey))
 	router.POST("/update/gauge/", handlers.WithoutID)
 	router.POST("/update/counter/", handlers.WithoutID)
-	router.POST("/update/:type/:name/:value", handlers.StringUpdatesHandler(&filestore, &memstore))
 
 	return router
 }
@@ -71,15 +79,22 @@ func main() {
 		log.Println(err)
 	}
 	log.Println("Running config - ", config)
+
 	// Init file and db storages
 	filestore.InitFileStorage(config)
-	err = dbstore.SetupDBStorage(config.DatabaseDSN, ctx)
+	err = dbstore.DBConnectStorage(ctx, config.DatabaseDSN, "rt_metrics")
 	if err != nil {
-		log.Println("DB: ", err)
+		log.Println("DB error : ", err)
 	}
 	if dbstore.Connection != nil {
 		defer dbstore.Connection.Close()
+		log.Println("DB connection: Success")
+		err := dbstore.DBCreateTable()
+		if err != nil {
+			log.Println("DB failed to create table, ", dbstore.TableName, err)
+		}
 	}
+
 	// Handle file interaction if neccesary
 	if config.Restore {
 		err := memstore.ReadOldMetrics(filestore.FilePath)
@@ -91,6 +106,7 @@ func main() {
 		go filestore.IntervalUpdate(ctx, config.StoreInterval, &memstore)
 	}
 
+	// Start gin engine
 	router := setupGinHandlers()
 	server := &http.Server{
 		Addr:    config.Address,
@@ -103,6 +119,7 @@ func main() {
 		}
 	}()
 
+	// Wait and handle syscall exits
 	signal.Notify(syscallCancelChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	sig := <-syscallCancelChan
 	log.Println("Caught syscall: ", sig)
@@ -110,8 +127,17 @@ func main() {
 		log.Fatal("Server Shutdown:", err)
 	}
 	log.Println("Server exiting")
-	err = filestore.SaveDataToFile(filestore.StoreData, &memstore)
-	if err != nil {
-		log.Println("Failed to save data on server exit;", err)
+
+	// Store data in file on exit if condition
+	if dbstore.Connection != nil {
+		err = filestore.SaveDBDataToFile(filestore.StoreData, &dbstore)
+		if err != nil {
+			log.Println("Failed to save data on server exit (DBStorage);", err)
+		}
+	} else {
+		err = filestore.SaveMemDataToFile(filestore.StoreData, &memstore)
+		if err != nil {
+			log.Println("Failed to save data on server exit (MEMStorage);", err)
+		}
 	}
 }

@@ -1,18 +1,12 @@
 package storage
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"os"
 	"strconv"
 	"sync"
-	"time"
-
-	"github.com/jackc/pgx"
-
-	"github.com/dsft54/rt-metrics/cmd/server/settings"
 )
 
 type Metrics struct {
@@ -107,97 +101,5 @@ func (m *MemoryStorage) WriteMetricsToFile(file *os.File) error {
 	if err != nil {
 		return err
 	}
-	return nil
-}
-
-type FileStorage struct {
-	File        *os.File
-	FilePath    string
-	StoreData   bool
-	Synchronize bool
-}
-
-func (f *FileStorage) OpenToWrite(path string) error {
-	var err error
-	f.File, err = os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (f *FileStorage) SaveDataToFile(condition bool, m *MemoryStorage) error {
-	if condition {
-		err := f.OpenToWrite(f.FilePath)
-		if err != nil {
-			return err
-		}
-		m.WriteMetricsToFile(f.File)
-		f.File.Close()
-	}
-	return nil
-}
-
-func (f *FileStorage) InitFileStorage(cfg settings.Config) {
-	if cfg.StoreFile == "" {
-		f.StoreData = false
-		f.Synchronize = false
-	} else {
-		f.FilePath = cfg.StoreFile
-		f.StoreData = true
-	}
-	if cfg.StoreInterval == 0 {
-		f.Synchronize = true
-	}
-	if cfg.StoreInterval > 0 {
-		f.Synchronize = false
-	}
-	if cfg.DatabaseDSN != "" {
-		f.Synchronize = false
-	}
-}
-
-func (f *FileStorage) IntervalUpdate(ctx context.Context, dur time.Duration, s *MemoryStorage) {
-	intervalTicker := time.NewTicker(dur)
-	for {
-		select {
-		case <-intervalTicker.C:
-			f.OpenToWrite(f.FilePath)
-			s.WriteMetricsToFile(f.File)
-			f.File.Close()
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-type DBStorage struct {
-	Connection *pgx.Conn
-	ConnConfig pgx.ConnConfig
-	Context    context.Context
-}
-
-func (d *DBStorage) Ping() error {
-	err := d.Connection.Ping(d.Context)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (d *DBStorage) SetupDBStorage(auth string, ctx context.Context) error {
-	var err error
-	if auth == "" {
-		return nil
-	}
-	d.ConnConfig, err = pgx.ParseConnectionString(auth)
-	if err != nil {
-		return errors.New("DB auth uri parse failed")
-	}
-	d.Connection, err = pgx.Connect(d.ConnConfig)
-	if err != nil {
-		return errors.New("WARNING! DB connection failed")
-	}
-	d.Context = ctx
 	return nil
 }

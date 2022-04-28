@@ -169,7 +169,7 @@ func TestHandleUpdateJSON(t *testing.T) {
 
 			w := httptest.NewRecorder()
 			_, r := gin.CreateTestContext(w)
-			r.POST("/update", HandleUpdateJSON(&testFileStore, &testStore, ""))
+			r.POST("/update", HandleUpdateJSON(&testStore, &testFileStore,  ""))
 
 			if tt.request.MType == "gauge" {
 				tt.request.Value = &tt.valueG
