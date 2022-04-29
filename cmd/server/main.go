@@ -99,9 +99,16 @@ func main() {
 
 	// Handle file interaction if neccesary
 	if config.Restore {
-		err := memstore.ReadOldMetrics(filestore.FilePath)
-		if err != nil {
-			log.Println("Wanted to restore old metrics from file on server start but failed; ", err)
+		if dbstore.Connection != nil {
+			err := dbstore.ReadOldMetrics(filestore.FilePath)
+			if err != nil {
+				log.Println("(DBStorage) Wanted to restore old metrics from file on server start but failed; ", err)
+			}
+		} else {
+			err := memstore.ReadOldMetrics(filestore.FilePath)
+			if err != nil {
+				log.Println("(Memstorage) Wanted to restore old metrics from file on server start but failed; ", err)
+			}
 		}
 	}
 	if filestore.StoreData && !filestore.Synchronize && config.DatabaseDSN == "" {

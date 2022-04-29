@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"strconv"
 
 	"github.com/jackc/pgx"
@@ -50,7 +51,7 @@ func (d *DBStorage) DBCheckTableExists() error {
 			WHERE schemaname = 'public'
 			AND tablename  = rt_metrics
 		);`)
-	var tableExists bool = false
+	var tableExists bool
 	err := row.Scan(&tableExists)
 	if err != nil {
 		return err
@@ -215,6 +216,23 @@ func (d *DBStorage) DBBatchQuery(metrics []Metrics) error {
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+func (d *DBStorage) ReadOldMetrics(path string) error {
+	var metricsSlice []Metrics
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(data, &metricsSlice)
+	if err != nil {
+		return err
+	}
+	err = d.DBBatchQuery(metricsSlice)
+	if err != nil {
+		return err
 	}
 	return nil
 }

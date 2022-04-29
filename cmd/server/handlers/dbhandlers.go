@@ -58,7 +58,6 @@ func DBAddressedRequest(db *storage.DBStorage) gin.HandlerFunc {
 			return
 		}
 		c.Status(http.StatusNotFound)
-		return
 	}
 }
 
@@ -80,6 +79,7 @@ func DBHandleRequestJSON(db *storage.DBStorage, key string) gin.HandlerFunc {
 		metricsResponse, err := db.DBReadSpecific(metricsRequest)
 		if err != nil {
 			c.Status(http.StatusInternalServerError)
+			return
 		}
 		switch metricsResponse.MType {
 		case "gauge":
@@ -178,7 +178,6 @@ func DBRootHandler(db *storage.DBStorage) gin.HandlerFunc {
 			return
 		}
 		c.Data(http.StatusOK, "text/html; charset=utf-8", data)
-		return
 	}
 }
 
