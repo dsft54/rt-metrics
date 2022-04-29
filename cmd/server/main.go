@@ -33,8 +33,8 @@ func init() {
 
 	flag.StringVar(&config.Address, "a", "localhost:8080", "Server address")
 	flag.BoolVar(&config.Restore, "r", true, "Restore metrics from file on start")
-	flag.StringVar(&config.StoreFile, "f", "/tmp/devops-metrics-db.json", "Path to file storage")
-	flag.DurationVar(&config.StoreInterval, "i", 300*time.Second, "Update file storage interval")
+	flag.StringVar(&config.StoreFile, "f", "devops-metrics-db.json", "Path to file storage")
+	flag.DurationVar(&config.StoreInterval, "i", 1*time.Second, "Update file storage interval")
 	flag.StringVar(&config.HashKey, "k", "", "SHA256 signing key")
 	flag.StringVar(&config.DatabaseDSN, "d", "postgres://postgres:example@localhost:5432", "Postgress connection uri")
 }
@@ -146,12 +146,12 @@ func main() {
 		if err != nil {
 			log.Println("Failed to save data on server exit (DBStorage);", err)
 		}
-		log.Println("SAVED DB on exit")
+		log.Println("SAVED DB to file on exit")
 	} else {
 		err = filestore.SaveMemDataToFile(filestore.StoreData, &memstore)
 		if err != nil {
 			log.Println("Failed to save data on server exit (MEMStorage);", err)
 		}
-		log.Println("SAVED MEM on exit")
+		log.Println("SAVED MEM to file on exit")
 	}
 }

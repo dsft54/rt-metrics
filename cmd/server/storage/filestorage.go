@@ -40,16 +40,16 @@ func (f *FileStorage) SaveMemDataToFile(condition bool, m *MemoryStorage) error 
 
 func (f *FileStorage) SaveDBDataToFile(condition bool, d *DBStorage) error {
 	if condition {
-		err := f.OpenToWrite(f.FilePath)
-		if err != nil {
-			return err
-		}
 		metrics, err := d.DBReadAll()
 		if err != nil {
 			return err
 		}
 		log.Println("Tried to save db to file on exit", metrics)
 		data, err := json.Marshal(metrics)
+		if err != nil {
+			return err
+		}
+		err = f.OpenToWrite(f.FilePath)
 		if err != nil {
 			return err
 		}
