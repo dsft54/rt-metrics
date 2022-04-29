@@ -33,7 +33,7 @@ func init() {
 
 	flag.StringVar(&config.Address, "a", "localhost:8080", "Server address")
 	flag.BoolVar(&config.Restore, "r", true, "Restore metrics from file on start")
-	flag.StringVar(&config.StoreFile, "f", "devops-metrics-db.json", "Path to file storage")
+	flag.StringVar(&config.StoreFile, "f", "/tmp/devops-metrics-db.json", "Path to file storage")
 	flag.DurationVar(&config.StoreInterval, "i", 300*time.Second, "Update file storage interval")
 	flag.StringVar(&config.HashKey, "k", "", "SHA256 signing key")
 	flag.StringVar(&config.DatabaseDSN, "d", "postgres://postgres:example@localhost:5432", "Postgress connection uri")

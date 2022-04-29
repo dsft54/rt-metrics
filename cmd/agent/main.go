@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -22,7 +21,7 @@ import (
 func sendData(url string, m interface{}, client *resty.Client) error {
 	rawData, err := json.Marshal(m)
 	if err != nil {
-		fmt.Println(err)
+		log.Fatal(err)
 	}
 	_, err = client.R().
 		SetHeader("Content-Type", "application/json").
@@ -58,6 +57,7 @@ func reportMetrics(ctx context.Context, cfg *settings.Config, batched bool, s *s
 					log.Println(err)
 				}
 			}
+			log.Println("Atempted to report all metrics. Interval", cfg.ReportInterval)
 		case <-ctx.Done():
 			return
 		}
@@ -71,6 +71,7 @@ func pollMetrics(ctx context.Context, interval time.Duration, s *storage.Storage
 		select {
 		case <-pollTicker.C:
 			s.CollectMemMetrics()
+			log.Println("All runtime memory stats collected. Interval", interval)
 		case <-ctx.Done():
 			return
 		}
@@ -104,6 +105,6 @@ func main() {
 	go reportMetrics(ctx, &config, config.Batched, &s, wg)
 	sig := <-syscallCancelChan
 	cancel()
-	fmt.Printf("Caught syscall: %v", sig)
+	log.Printf("Caught syscall: %v", sig)
 	wg.Wait()
 }
