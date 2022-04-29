@@ -97,7 +97,10 @@ func (f *FileStorage) IntervalUpdateDB(ctx context.Context, dur time.Duration, d
 	for {
 		select {
 		case <-intervalTicker.C:
-			db.DBSaveToFile(f)
+			err := db.DBSaveToFile(f)
+			if err != nil {
+				log.Print("Failed to save metrics from db to file with ticker", err)
+			}
 		case <-ctx.Done():
 			return
 		}
