@@ -48,21 +48,27 @@ func setupGinHandlers() *gin.Engine {
 		gin.Logger(),
 	)
 
-	if dbstore.Connection != nil {
-		router.GET("/", handlers.DBRootHandler(&dbstore))
-		router.GET("/value/:type/:name", handlers.DBAddressedRequest(&dbstore))
-		router.POST("/update/", handlers.DBHandleUpdateJSON(&dbstore, &filestore, config.HashKey))
-		router.POST("/value/", handlers.DBHandleRequestJSON(&dbstore, config.HashKey))
-		router.POST("/updates/", handlers.DBBatchUpdate(&dbstore, &filestore, config.HashKey))
-		router.POST("/update/:type/:name/:value", handlers.DBStringUpdatesHandler(&dbstore, &filestore))
-	} else {
-		router.GET("/", handlers.RootHandler(&memstore))
-		router.GET("/value/:type/:name", handlers.AddressedRequest(&memstore))
-		router.POST("/update/", handlers.HandleUpdateJSON(&memstore, &filestore, config.HashKey))
-		router.POST("/value/", handlers.HandleRequestJSON(&memstore, config.HashKey))
-		router.POST("/updates/", handlers.BatchUpdate(&memstore, &filestore, config.HashKey))
-		router.POST("/update/:type/:name/:value", handlers.StringUpdatesHandler(&memstore, &filestore))
-	}
+	// if dbstore.Connection != nil {
+	// 	router.GET("/", handlers.DBRootHandler(&dbstore))
+	// 	router.GET("/value/:type/:name", handlers.DBAddressedRequest(&dbstore))
+	// 	router.POST("/update/", handlers.DBHandleUpdateJSON(&dbstore, &filestore, config.HashKey))
+	// 	router.POST("/value/", handlers.DBHandleRequestJSON(&dbstore, config.HashKey))
+	// 	router.POST("/updates/", handlers.DBBatchUpdate(&dbstore, &filestore, config.HashKey))
+	// 	router.POST("/update/:type/:name/:value", handlers.DBStringUpdatesHandler(&dbstore, &filestore))
+	// } else {
+	// 	router.GET("/", handlers.RootHandler(&memstore))
+	// 	router.GET("/value/:type/:name", handlers.AddressedRequest(&memstore))
+	// 	router.POST("/update/", handlers.HandleUpdateJSON(&memstore, &filestore, config.HashKey))
+	// 	router.POST("/value/", handlers.HandleRequestJSON(&memstore, config.HashKey))
+	// 	router.POST("/updates/", handlers.BatchUpdate(&memstore, &filestore, config.HashKey))
+	// 	router.POST("/update/:type/:name/:value", handlers.StringUpdatesHandler(&memstore, &filestore))
+	// }
+	router.GET("/", handlers.RootHandler(&memstore))
+	router.GET("/value/:type/:name", handlers.AddressedRequest(&memstore))
+	router.POST("/update/", handlers.HandleUpdateJSON(&memstore, &filestore, config.HashKey))
+	router.POST("/value/", handlers.HandleRequestJSON(&memstore, config.HashKey))
+	router.POST("/updates/", handlers.BatchUpdate(&memstore, &filestore, config.HashKey))
+	router.POST("/update/:type/:name/:value", handlers.StringUpdatesHandler(&memstore, &filestore))
 	router.GET("/ping", handlers.PingDB(&dbstore))
 	router.POST("/update/gauge/", handlers.WithoutID)
 	router.POST("/update/counter/", handlers.WithoutID)
