@@ -64,6 +64,7 @@ func DBAddressedRequest(db *storage.DBStorage) gin.HandlerFunc {
 func DBHandleRequestJSON(db *storage.DBStorage, key string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rawData, err := c.GetRawData()
+		log.Println("JSON REQUEST body --- ", string(rawData))
 		if err != nil {
 			log.Println(err)
 			c.Status(http.StatusInternalServerError)
@@ -76,21 +77,26 @@ func DBHandleRequestJSON(db *storage.DBStorage, key string) gin.HandlerFunc {
 			c.Status(http.StatusInternalServerError)
 			return
 		}
+		log.Println("JSON REQUEST json unmarshall result --- ", metricsRequest)
 		metricsResponse, err := db.DBReadSpecific(metricsRequest)
 		if err != nil {
 			c.Status(http.StatusInternalServerError)
 			return
 		}
-		switch metricsResponse.MType {
-		case "gauge":
-			h := hmac.New(sha256.New, []byte(key))
-			h.Write([]byte(fmt.Sprintf("%s:gauge:%f", metricsResponse.ID, *metricsResponse.Value)))
-			metricsResponse.Hash = hex.EncodeToString(h.Sum(nil))
-		case "counter":
-			h := hmac.New(sha256.New, []byte(key))
-			h.Write([]byte(fmt.Sprintf("%s:counter:%d", metricsResponse.ID, *metricsResponse.Delta)))
-			metricsResponse.Hash = hex.EncodeToString(h.Sum(nil))
+		log.Println("JSON REQUEST json response after read DB --- ", metricsResponse)
+		if key != "" {
+			switch metricsResponse.MType {
+			case "gauge":
+				h := hmac.New(sha256.New, []byte(key))
+				h.Write([]byte(fmt.Sprintf("%s:gauge:%f", metricsResponse.ID, *metricsResponse.Value)))
+				metricsResponse.Hash = hex.EncodeToString(h.Sum(nil))
+			case "counter":
+				h := hmac.New(sha256.New, []byte(key))
+				h.Write([]byte(fmt.Sprintf("%s:counter:%d", metricsResponse.ID, *metricsResponse.Delta)))
+				metricsResponse.Hash = hex.EncodeToString(h.Sum(nil))
+			}
 		}
+		log.Println("JSON REQUEST json response after hash added or right before sending --- ", metricsResponse)
 		c.JSON(http.StatusOK, metricsResponse)
 	}
 }
@@ -98,6 +104,7 @@ func DBHandleRequestJSON(db *storage.DBStorage, key string) gin.HandlerFunc {
 func DBHandleUpdateJSON(db *storage.DBStorage, fs *storage.FileStorage, key string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rawData, err := c.GetRawData()
+		log.Println("JSON UPDATE body --- ", string(rawData))
 		if err != nil {
 			log.Println(err)
 			c.Status(http.StatusInternalServerError)
@@ -110,6 +117,7 @@ func DBHandleUpdateJSON(db *storage.DBStorage, fs *storage.FileStorage, key stri
 			c.Status(http.StatusInternalServerError)
 			return
 		}
+		log.Println("JSON UPDATE json unmarshall result --- ", metricsRequest)
 		switch metricsRequest.MType {
 		case "gauge":
 			if key != "" {
@@ -122,6 +130,7 @@ func DBHandleUpdateJSON(db *storage.DBStorage, fs *storage.FileStorage, key stri
 			}
 			err = db.DBInsertGauge(metricsRequest)
 			if err != nil {
+				log.Println("INSERT GAUGE ERR", err)
 				c.Status(http.StatusInternalServerError)
 				return
 			}
@@ -136,6 +145,7 @@ func DBHandleUpdateJSON(db *storage.DBStorage, fs *storage.FileStorage, key stri
 			}
 			err = db.DBInsertCounter(metricsRequest)
 			if err != nil {
+				log.Println("INSERT COUNTER ERR", err)
 				c.Status(http.StatusInternalServerError)
 				return
 			}
