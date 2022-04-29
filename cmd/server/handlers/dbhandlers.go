@@ -80,6 +80,9 @@ func DBHandleRequestJSON(db *storage.DBStorage, key string) gin.HandlerFunc {
 		log.Println("JSON REQUEST json unmarshall result --- ", metricsRequest)
 		metricsResponse, err := db.DBReadSpecific(metricsRequest)
 		if err != nil {
+			log.Println("JSON REQUEST read from db error with request --- ", metricsRequest)
+			m, _ := db.DBReadAll()
+			log.Println("JSON REQUEST db contains --- ", m)
 			c.Status(http.StatusInternalServerError)
 			return
 		}
