@@ -84,18 +84,18 @@ func main() {
 
 	// Init file and db storages
 	filestore.InitFileStorage(config)
-	// err = dbstore.DBConnectStorage(ctx, config.DatabaseDSN, "rt_metrics")
-	// if err != nil {
-	// 	log.Println("DB error : ", err)
-	// }
-	// if dbstore.Connection != nil {
-	// 	defer dbstore.Connection.Close()
-	// 	log.Println("DB connection: Success")
-	// 	err := dbstore.DBCreateTable()
-	// 	if err != nil {
-	// 		log.Println("DB failed to create table, ", dbstore.TableName, err)
-	// 	}
-	// }
+	err = dbstore.DBConnectStorage(ctx, config.DatabaseDSN, "rt_metrics")
+	if err != nil {
+		log.Println("DB error : ", err)
+	}
+	if dbstore.Connection != nil {
+		defer dbstore.Connection.Close()
+		log.Println("DB connection: Success")
+		err := dbstore.DBCreateTable()
+		if err != nil {
+			log.Println("DB failed to create table, ", dbstore.TableName, err)
+		}
+	}
 
 	// Handle file interaction if neccesary
 	if config.Restore {
@@ -111,12 +111,12 @@ func main() {
 			}
 		}
 	}
-	if filestore.StoreData && !filestore.Synchronize {
+	if filestore.StoreData && !filestore.Synchronize && config.DatabaseDSN == "" {
 		go filestore.IntervalUpdateMem(ctx, config.StoreInterval, &memstore)
 	}
-	// if filestore.StoreData && !filestore.Synchronize && config.DatabaseDSN != "" {
-	// 	go filestore.IntervalUpdateDB(ctx, config.StoreInterval, &dbstore)
-	// }
+	if filestore.StoreData && !filestore.Synchronize && config.DatabaseDSN != "" {
+		go filestore.IntervalUpdateDB(ctx, config.StoreInterval, &dbstore)
+	}
 
 	// Start gin engine
 	router := setupGinHandlers()

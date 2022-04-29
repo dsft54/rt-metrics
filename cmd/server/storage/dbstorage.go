@@ -234,9 +234,24 @@ func (d *DBStorage) ReadOldMetrics(path string) error {
 	if err != nil {
 		return err
 	}
-	err = d.DBBatchQuery(metricsSlice)
-	if err != nil {
-		return err
+	for _, metric := range metricsSlice {
+		switch metric.MType {
+		case "gauge":
+			err := d.DBInsertGauge(&metric)
+			if err != nil {
+				return err
+			}
+		case "counter":
+			_, err := d.Connection.Exec(
+				`INSERT INTO rt_metrics (id, mtype, delta, hash)
+						VALUES ($1, $2, $3, $4)
+						ON CONFLICT (id) DO UPDATE
+						SET delta = excluded.delta, hash = excluded.hash;`,
+				metric.ID, metric.MType, metric.Delta, metric.Hash)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
