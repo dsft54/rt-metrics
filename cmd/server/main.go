@@ -48,27 +48,21 @@ func setupGinHandlers() *gin.Engine {
 		gin.Logger(),
 	)
 
-	// if dbstore.Connection != nil {
-	// 	router.GET("/", handlers.DBRootHandler(&dbstore))
-	// 	router.GET("/value/:type/:name", handlers.DBAddressedRequest(&dbstore))
-	// 	router.POST("/update/", handlers.DBHandleUpdateJSON(&dbstore, &filestore, config.HashKey))
-	// 	router.POST("/value/", handlers.DBHandleRequestJSON(&dbstore, config.HashKey))
-	// 	router.POST("/updates/", handlers.DBBatchUpdate(&dbstore, &filestore, config.HashKey))
-	// 	router.POST("/update/:type/:name/:value", handlers.DBStringUpdatesHandler(&dbstore, &filestore))
-	// } else {
-	// 	router.GET("/", handlers.RootHandler(&memstore))
-	// 	router.GET("/value/:type/:name", handlers.AddressedRequest(&memstore))
-	// 	router.POST("/update/", handlers.HandleUpdateJSON(&memstore, &filestore, config.HashKey))
-	// 	router.POST("/value/", handlers.HandleRequestJSON(&memstore, config.HashKey))
-	// 	router.POST("/updates/", handlers.BatchUpdate(&memstore, &filestore, config.HashKey))
-	// 	router.POST("/update/:type/:name/:value", handlers.StringUpdatesHandler(&memstore, &filestore))
-	// }
-	router.GET("/", handlers.RootHandler(&memstore))
-	router.GET("/value/:type/:name", handlers.AddressedRequest(&memstore))
-	router.POST("/update/", handlers.HandleUpdateJSON(&memstore, &filestore, config.HashKey))
-	router.POST("/value/", handlers.HandleRequestJSON(&memstore, config.HashKey))
-	router.POST("/updates/", handlers.BatchUpdate(&memstore, &filestore, config.HashKey))
-	router.POST("/update/:type/:name/:value", handlers.StringUpdatesHandler(&memstore, &filestore))
+	if dbstore.Connection != nil {
+		router.GET("/", handlers.DBRootHandler(&dbstore))
+		router.GET("/value/:type/:name", handlers.DBAddressedRequest(&dbstore))
+		router.POST("/update/", handlers.DBHandleUpdateJSON(&dbstore, &filestore, config.HashKey))
+		router.POST("/value/", handlers.DBHandleRequestJSON(&dbstore, config.HashKey))
+		router.POST("/updates/", handlers.DBBatchUpdate(&dbstore, &filestore, config.HashKey))
+		router.POST("/update/:type/:name/:value", handlers.DBStringUpdatesHandler(&dbstore, &filestore))
+	} else {
+		router.GET("/", handlers.RootHandler(&memstore))
+		router.GET("/value/:type/:name", handlers.AddressedRequest(&memstore))
+		router.POST("/update/", handlers.HandleUpdateJSON(&memstore, &filestore, config.HashKey))
+		router.POST("/value/", handlers.HandleRequestJSON(&memstore, config.HashKey))
+		router.POST("/updates/", handlers.BatchUpdate(&memstore, &filestore, config.HashKey))
+		router.POST("/update/:type/:name/:value", handlers.StringUpdatesHandler(&memstore, &filestore))
+	}
 	router.GET("/ping", handlers.PingDB(&dbstore))
 	router.POST("/update/gauge/", handlers.WithoutID)
 	router.POST("/update/counter/", handlers.WithoutID)
@@ -90,18 +84,18 @@ func main() {
 
 	// Init file and db storages
 	filestore.InitFileStorage(config)
-	err = dbstore.DBConnectStorage(ctx, config.DatabaseDSN, "rt_metrics")
-	if err != nil {
-		log.Println("DB error : ", err)
-	}
-	if dbstore.Connection != nil {
-		defer dbstore.Connection.Close()
-		log.Println("DB connection: Success")
-		err := dbstore.DBCreateTable()
-		if err != nil {
-			log.Println("DB failed to create table, ", dbstore.TableName, err)
-		}
-	}
+	// err = dbstore.DBConnectStorage(ctx, config.DatabaseDSN, "rt_metrics")
+	// if err != nil {
+	// 	log.Println("DB error : ", err)
+	// }
+	// if dbstore.Connection != nil {
+	// 	defer dbstore.Connection.Close()
+	// 	log.Println("DB connection: Success")
+	// 	err := dbstore.DBCreateTable()
+	// 	if err != nil {
+	// 		log.Println("DB failed to create table, ", dbstore.TableName, err)
+	// 	}
+	// }
 
 	// Handle file interaction if neccesary
 	if config.Restore {
