@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"os"
 	"time"
 
@@ -47,6 +48,7 @@ func (f *FileStorage) SaveDBDataToFile(condition bool, d *DBStorage) error {
 		if err != nil {
 			return err
 		}
+		log.Println("Tried to save db to file on exit", metrics)
 		data, err := json.Marshal(metrics)
 		if err != nil {
 			return err
