@@ -70,6 +70,7 @@ func HandleRequestJSON(st *storage.MemoryStorage, key string) gin.HandlerFunc {
 			c.Status(http.StatusInternalServerError)
 			return
 		}
+		log.Println("JSON REQUEST raw", string(rawData))
 		metricsRequest := &storage.Metrics{}
 		err = json.Unmarshal(rawData, metricsRequest)
 		if err != nil {
@@ -77,6 +78,8 @@ func HandleRequestJSON(st *storage.MemoryStorage, key string) gin.HandlerFunc {
 			c.Status(http.StatusInternalServerError)
 			return
 		}
+		log.Println("JSON REQUEST unmarhalled", metricsRequest)
+		log.Println("JSON REQUEST memory state", st)
 		switch metricsRequest.MType {
 		case "gauge":
 			v := st.GaugeMetrics[metricsRequest.ID]

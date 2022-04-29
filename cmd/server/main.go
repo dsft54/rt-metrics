@@ -111,7 +111,7 @@ func main() {
 			}
 		}
 	}
-	if filestore.StoreData && !filestore.Synchronize && config.DatabaseDSN == "" {
+	if filestore.StoreData && !filestore.Synchronize {
 		go filestore.IntervalUpdateMem(ctx, config.StoreInterval, &memstore)
 	}
 	// if filestore.StoreData && !filestore.Synchronize && config.DatabaseDSN != "" {

@@ -106,7 +106,7 @@ func (d *DBStorage) DBInsertCounter(m *Metrics) error {
 
 func (d *DBStorage) DBReadAll() ([]Metrics, error) {
 	// Read all metrics from db
-	metrics := []Metrics{}
+	var metricsSlice []Metrics
 	rows, err := d.Connection.Query("SELECT * FROM rt_metrics;")
 	if err != nil {
 		return nil, err
@@ -117,13 +117,13 @@ func (d *DBStorage) DBReadAll() ([]Metrics, error) {
 		if err != nil {
 			return nil, err
 		}
-		metrics = append(metrics, metric)
+		metricsSlice = append(metricsSlice, metric)
 	}
 	err = rows.Err()
 	if err != nil {
 		return nil, err
 	}
-	return metrics, nil
+	return metricsSlice, nil
 }
 
 func (d *DBStorage) DBReadSpecific(rm *Metrics) (*Metrics, error) {

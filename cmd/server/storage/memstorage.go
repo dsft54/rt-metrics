@@ -48,7 +48,6 @@ func (m *MemoryStorage) UpdateMetricsFromString(metricType, metricName, metricVa
 
 func (m *MemoryStorage) ReadOldMetrics(path string) error {
 	var metricsSlice []Metrics
-
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	data, err := ioutil.ReadFile(path)
@@ -59,7 +58,6 @@ func (m *MemoryStorage) ReadOldMetrics(path string) error {
 	if err != nil {
 		return err
 	}
-
 	for _, val := range metricsSlice {
 		switch val.MType {
 		case "gauge":
