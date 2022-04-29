@@ -181,3 +181,56 @@ func DBRootHandler(db *storage.DBStorage) gin.HandlerFunc {
 		return
 	}
 }
+
+func DBBatchUpdate(db *storage.DBStorage, fs *storage.FileStorage, key string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		rawData, err := c.GetRawData()
+		if err != nil {
+			log.Println(err)
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		metricsBatch := []storage.Metrics{}
+		err = json.Unmarshal(rawData, &metricsBatch)
+		if err != nil {
+			log.Println(err)
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		metricsBatchClean := []storage.Metrics{}
+		if key != "" {
+			for _, metric := range metricsBatch {
+				switch metric.MType {
+				case "gauge":
+					h := hmac.New(sha256.New, []byte(key))
+					h.Write([]byte(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value)))
+					if metric.Hash != hex.EncodeToString(h.Sum(nil)) {
+						continue
+					}
+					metricsBatchClean = append(metricsBatchClean, metric)
+				case "counter":
+					h := hmac.New(sha256.New, []byte(key))
+					h.Write([]byte(fmt.Sprintf("%s:counter:%d", metric.ID, *metric.Delta)))
+					if metric.Hash != hex.EncodeToString(h.Sum(nil)) {
+						continue
+					}
+					metricsBatchClean = append(metricsBatchClean, metric)
+				}
+			}
+			metricsBatch = metricsBatchClean
+		}
+		err = db.DBBatchQuery(metricsBatch)
+		if err != nil {
+			log.Println("Error while update metrics from batch", err)
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		err = db.DBSaveToFile(fs)
+		if err != nil {
+			log.Println("Synchronized data saving was failed", err)
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		c.Status(http.StatusOK)
+	}
+}

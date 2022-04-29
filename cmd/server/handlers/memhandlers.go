@@ -142,6 +142,53 @@ func HandleUpdateJSON(st *storage.MemoryStorage, fs *storage.FileStorage, key st
 	}
 }
 
+func BatchUpdate(st *storage.MemoryStorage, fs *storage.FileStorage, key string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		rawData, err := c.GetRawData()
+		if err != nil {
+			log.Println(err)
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		metricsBatch := []storage.Metrics{}
+		err = json.Unmarshal(rawData, &metricsBatch)
+		if err != nil {
+			log.Println(err)
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		for _, metric := range metricsBatch {
+			switch metric.MType {
+			case "gauge":
+				if key != "" {
+					h := hmac.New(sha256.New, []byte(key))
+					h.Write([]byte(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value)))
+					if metric.Hash != hex.EncodeToString(h.Sum(nil)) {
+						continue
+					}
+				}
+				st.GaugeMetrics[metric.ID] = *metric.Value
+			case "counter":
+				if key != "" {
+					h := hmac.New(sha256.New, []byte(key))
+					h.Write([]byte(fmt.Sprintf("%s:counter:%d", metric.ID, *metric.Delta)))
+					if metric.Hash != hex.EncodeToString(h.Sum(nil)) {
+						continue
+					}
+				}
+				st.CounterMetrics[metric.ID] += *metric.Delta
+			}
+		}
+		err = fs.SaveMemDataToFile(fs.Synchronize, st)
+		if err != nil {
+			log.Println("Synchronized data saving was failed", err)
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		c.Status(http.StatusOK)
+	}
+}
+
 func WithoutID(c *gin.Context) {
 	c.Status(http.StatusNotFound)
 }

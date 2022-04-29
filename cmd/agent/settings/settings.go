@@ -7,4 +7,5 @@ type Config struct {
 	PollInterval   time.Duration `env:"POLL_INTERVAL"`
 	ReportInterval time.Duration `env:"REPORT_INTERVAL"`
 	HashKey        string        `env:"ADDRESS"`
+	Batched        bool          `env:"BATCHED"`
 }

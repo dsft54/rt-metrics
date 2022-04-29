@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"sync"
@@ -13,12 +14,12 @@ import (
 
 	"github.com/caarlos0/env"
 	"github.com/go-resty/resty/v2"
-	
+
 	"github.com/dsft54/rt-metrics/cmd/agent/settings"
 	"github.com/dsft54/rt-metrics/cmd/agent/storage"
 )
 
-func sendData(url string, m *storage.Metrics, client *resty.Client) error {
+func sendData(url string, m interface{}, client *resty.Client) error {
 	rawData, err := json.Marshal(m)
 	if err != nil {
 		fmt.Println(err)
@@ -30,7 +31,7 @@ func sendData(url string, m *storage.Metrics, client *resty.Client) error {
 	return err
 }
 
-func reportMetrics(ctx context.Context, cfg *settings.Config, s *storage.Storage, wg *sync.WaitGroup) {
+func reportMetrics(ctx context.Context, cfg *settings.Config, batched bool, s *storage.Storage, wg *sync.WaitGroup) {
 	defer wg.Done()
 	client := resty.New()
 	reportTicker := time.NewTicker(cfg.ReportInterval)
@@ -38,15 +39,23 @@ func reportMetrics(ctx context.Context, cfg *settings.Config, s *storage.Storage
 		select {
 		case <-reportTicker.C:
 			metricsSlice := s.RebuildDataToJSON(cfg.HashKey)
-			for _, value := range metricsSlice {
-				select {
-				case <-ctx.Done():
-					return
-				default:
-					err := sendData("http://"+cfg.Address+"/update", &value, client)
-					if err != nil {
-						continue
+			if !batched {
+				for _, value := range metricsSlice {
+					select {
+					case <-ctx.Done():
+						return
+					default:
+						err := sendData("http://"+cfg.Address+"/update", &value, client)
+						if err != nil {
+							log.Println(err)
+							continue
+						}
 					}
+				}
+			} else {
+				err := sendData("http://"+cfg.Address+"/updates", &metricsSlice, client)
+				if err != nil {
+					log.Println(err)
 				}
 			}
 		case <-ctx.Done():
@@ -72,6 +81,7 @@ func init() {
 	flag.StringVar(&config.Address, "a", "localhost:8080", "Metrics server address")
 	flag.DurationVar(&config.PollInterval, "p", 2*time.Second, "Runtime poll interval")
 	flag.DurationVar(&config.ReportInterval, "r", 10*time.Second, "Report metrics interval")
+	flag.BoolVar(&config.Batched, "b", true, "Batched metric report")
 	flag.StringVar(&config.HashKey, "k", "", "SHA256 signing key")
 }
 
@@ -91,7 +101,7 @@ func main() {
 
 	signal.Notify(syscallCancelChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	go pollMetrics(ctx, config.PollInterval, &s, wg)
-	go reportMetrics(ctx, &config, &s, wg)
+	go reportMetrics(ctx, &config, config.Batched, &s, wg)
 	sig := <-syscallCancelChan
 	cancel()
 	fmt.Printf("Caught syscall: %v", sig)

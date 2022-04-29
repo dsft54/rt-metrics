@@ -200,3 +200,21 @@ func (d *DBStorage) DBSaveToFile(f *FileStorage) error {
 	}
 	return nil
 }
+
+func (d *DBStorage) DBBatchQuery(metrics []Metrics) error {
+	for _, metric := range metrics {
+		switch metric.MType {
+		case "gauge":
+			err := d.DBInsertGauge(&metric)
+			if err != nil {
+				return err
+			}
+		case "counter":
+			err := d.DBInsertCounter(&metric)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
