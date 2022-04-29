@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
-	"log"
 	"strconv"
 
 	"github.com/jackc/pgx"
@@ -214,7 +213,6 @@ func (d *DBStorage) DBBatchQuery(metrics []Metrics) error {
 				return err
 			}
 		case "counter":
-			log.Println(metric, &metric)
 			err := d.DBInsertCounter(&metric)
 			if err != nil {
 				return err

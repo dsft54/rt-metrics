@@ -146,12 +146,12 @@ func main() {
 		if err != nil {
 			log.Println("Failed to save data on server exit (DBStorage);", err)
 		}
-		log.Println("SAVED DB to file on exit")
+		log.Println("Saved db to file on exit")
 	} else {
 		err = filestore.SaveMemDataToFile(filestore.StoreData, &memstore)
 		if err != nil {
 			log.Println("Failed to save data on server exit (MEMStorage);", err)
 		}
-		log.Println("SAVED MEM to file on exit")
+		log.Println("Saved mem to file on exit")
 	}
 }

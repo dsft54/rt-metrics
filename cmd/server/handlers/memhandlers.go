@@ -70,7 +70,6 @@ func HandleRequestJSON(st *storage.MemoryStorage, key string) gin.HandlerFunc {
 			c.Status(http.StatusInternalServerError)
 			return
 		}
-		log.Println("JSON REQUEST raw", string(rawData))
 		metricsRequest := &storage.Metrics{}
 		err = json.Unmarshal(rawData, metricsRequest)
 		if err != nil {
@@ -78,8 +77,6 @@ func HandleRequestJSON(st *storage.MemoryStorage, key string) gin.HandlerFunc {
 			c.Status(http.StatusInternalServerError)
 			return
 		}
-		log.Println("JSON REQUEST unmarhalled", metricsRequest)
-		log.Println("JSON REQUEST memory state", st)
 		switch metricsRequest.MType {
 		case "gauge":
 			v := st.GaugeMetrics[metricsRequest.ID]
@@ -106,7 +103,6 @@ func HandleUpdateJSON(st *storage.MemoryStorage, fs *storage.FileStorage, key st
 			c.Status(http.StatusInternalServerError)
 			return
 		}
-		log.Println("JSON UPDATE body", string(rawData))
 		metricsRequest := &storage.Metrics{}
 		err = json.Unmarshal(rawData, metricsRequest)
 		if err != nil {
@@ -114,8 +110,6 @@ func HandleUpdateJSON(st *storage.MemoryStorage, fs *storage.FileStorage, key st
 			c.Status(http.StatusInternalServerError)
 			return
 		}
-		log.Println("JSON UPDATE unmarshaled", metricsRequest)
-		log.Println("JSON UPDATE memory state before update", st)
 		switch metricsRequest.MType {
 		case "gauge":
 			if key != "" {
@@ -138,7 +132,6 @@ func HandleUpdateJSON(st *storage.MemoryStorage, fs *storage.FileStorage, key st
 			}
 			st.CounterMetrics[metricsRequest.ID] += *metricsRequest.Delta
 		}
-		log.Println("JSON UPDATE memory state after update", st)
 		err = fs.SaveMemDataToFile(fs.Synchronize, st)
 		if err != nil {
 			log.Println("Synchronized data saving was failed", err)

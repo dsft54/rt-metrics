@@ -66,7 +66,6 @@ func DBAddressedRequest(db *storage.DBStorage) gin.HandlerFunc {
 func DBHandleRequestJSON(db *storage.DBStorage, key string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rawData, err := c.GetRawData()
-		log.Println("JSON REQUEST body --- ", string(rawData))
 		if err != nil {
 			log.Println(err)
 			c.Status(http.StatusInternalServerError)
@@ -79,16 +78,12 @@ func DBHandleRequestJSON(db *storage.DBStorage, key string) gin.HandlerFunc {
 			c.Status(http.StatusInternalServerError)
 			return
 		}
-		log.Println("JSON REQUEST json unmarshall result --- ", metricsRequest)
 		metricsResponse, err := db.DBReadSpecific(metricsRequest)
 		if err != nil {
-			log.Println("JSON REQUEST read from db error with request --- ", metricsRequest, err)
-			m, _ := db.DBReadAll()
-			log.Println("JSON REQUEST db contains --- ", m)
+			log.Println(err)
 			c.Status(http.StatusNotFound)
 			return
 		}
-		log.Println("JSON REQUEST json response after read DB --- ", metricsResponse)
 		if key != "" {
 			switch metricsResponse.MType {
 			case "gauge":
@@ -101,7 +96,6 @@ func DBHandleRequestJSON(db *storage.DBStorage, key string) gin.HandlerFunc {
 				metricsResponse.Hash = hex.EncodeToString(h.Sum(nil))
 			}
 		}
-		log.Println("JSON REQUEST json response after hash added or right before sending --- ", metricsResponse)
 		c.JSON(http.StatusOK, metricsResponse)
 	}
 }
@@ -109,7 +103,6 @@ func DBHandleRequestJSON(db *storage.DBStorage, key string) gin.HandlerFunc {
 func DBHandleUpdateJSON(db *storage.DBStorage, fs *storage.FileStorage, key string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rawData, err := c.GetRawData()
-		log.Println("JSON UPDATE body --- ", string(rawData))
 		if err != nil {
 			log.Println(err)
 			c.Status(http.StatusInternalServerError)
@@ -122,7 +115,6 @@ func DBHandleUpdateJSON(db *storage.DBStorage, fs *storage.FileStorage, key stri
 			c.Status(http.StatusInternalServerError)
 			return
 		}
-		log.Println("JSON UPDATE json unmarshall result --- ", metricsRequest)
 		switch metricsRequest.MType {
 		case "gauge":
 			if key != "" {
