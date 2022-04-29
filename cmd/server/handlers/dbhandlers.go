@@ -25,11 +25,13 @@ func DBStringUpdatesHandler(db *storage.DBStorage, fs *storage.FileStorage) gin.
 			log.Println(err, "Type:", mType, "Name:", mName, "Value:", mValue, "Code:", code)
 		}
 		if code == 200 {
-			err = db.DBSaveToFile(fs)
-			if err != nil {
-				log.Println("Synchronized data saving was failed", err)
-				c.Status(http.StatusInternalServerError)
-				return
+			if fs.Synchronize {
+				err = db.DBSaveToFile(fs)
+				if err != nil {
+					log.Println("Synchronized data saving was failed", err)
+					c.Status(http.StatusInternalServerError)
+					return
+				}
 			}
 		}
 		c.Status(code)
@@ -153,11 +155,13 @@ func DBHandleUpdateJSON(db *storage.DBStorage, fs *storage.FileStorage, key stri
 				return
 			}
 		}
-		err = db.DBSaveToFile(fs)
-		if err != nil {
-			log.Println("Synchronized data saving was failed", err)
-			c.Status(http.StatusInternalServerError)
-			return
+		if fs.Synchronize {
+			err = db.DBSaveToFile(fs)
+			if err != nil {
+				log.Println("Synchronized data saving was failed", err)
+				c.Status(http.StatusInternalServerError)
+				return
+			}
 		}
 		c.Status(http.StatusOK)
 	}
@@ -237,11 +241,13 @@ func DBBatchUpdate(db *storage.DBStorage, fs *storage.FileStorage, key string) g
 			c.Status(http.StatusInternalServerError)
 			return
 		}
-		err = db.DBSaveToFile(fs)
-		if err != nil {
-			log.Println("Synchronized data saving was failed", err)
-			c.Status(http.StatusInternalServerError)
-			return
+		if fs.Synchronize {
+			err = db.DBSaveToFile(fs)
+			if err != nil {
+				log.Println("Synchronized data saving was failed", err)
+				c.Status(http.StatusInternalServerError)
+				return
+			}
 		}
 		c.Status(http.StatusOK)
 	}

@@ -74,12 +74,9 @@ func (f *FileStorage) InitFileStorage(cfg settings.Config) {
 	if cfg.StoreInterval > 0 {
 		f.Synchronize = false
 	}
-	if cfg.DatabaseDSN != "" {
-		f.Synchronize = false
-	}
 }
 
-func (f *FileStorage) IntervalUpdate(ctx context.Context, dur time.Duration, s *MemoryStorage) {
+func (f *FileStorage) IntervalUpdateMem(ctx context.Context, dur time.Duration, s *MemoryStorage) {
 	intervalTicker := time.NewTicker(dur)
 	for {
 		select {
@@ -87,6 +84,18 @@ func (f *FileStorage) IntervalUpdate(ctx context.Context, dur time.Duration, s *
 			f.OpenToWrite(f.FilePath)
 			s.WriteMetricsToFile(f.File)
 			f.File.Close()
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (f *FileStorage) IntervalUpdateDB(ctx context.Context, dur time.Duration, db *DBStorage) {
+	intervalTicker := time.NewTicker(dur)
+	for {
+		select {
+		case <-intervalTicker.C:
+			db.DBSaveToFile(f)
 		case <-ctx.Done():
 			return
 		}

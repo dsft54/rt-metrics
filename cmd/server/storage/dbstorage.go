@@ -184,8 +184,9 @@ func (d *DBStorage) DBUpdateValueFromParams(metricType, metricID, metricValue st
 }
 
 func (d *DBStorage) DBSaveToFile(f *FileStorage) error {
-	if !f.Synchronize {
-		return nil
+	err := f.OpenToWrite(f.FilePath)
+	if err != nil {
+		return err
 	}
 	metrics, err := d.DBReadAll()
 	if err != nil {
@@ -199,6 +200,7 @@ func (d *DBStorage) DBSaveToFile(f *FileStorage) error {
 	if err != nil {
 		return err
 	}
+	f.File.Close()
 	return nil
 }
 

@@ -112,7 +112,10 @@ func main() {
 		}
 	}
 	if filestore.StoreData && !filestore.Synchronize && config.DatabaseDSN == "" {
-		go filestore.IntervalUpdate(ctx, config.StoreInterval, &memstore)
+		go filestore.IntervalUpdateMem(ctx, config.StoreInterval, &memstore)
+	}
+	if filestore.StoreData && !filestore.Synchronize && config.DatabaseDSN == "" {
+		go filestore.IntervalUpdateDB(ctx, config.StoreInterval, &dbstore)
 	}
 
 	// Start gin engine
