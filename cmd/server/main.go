@@ -114,9 +114,9 @@ func main() {
 	if filestore.StoreData && !filestore.Synchronize && config.DatabaseDSN == "" {
 		go filestore.IntervalUpdateMem(ctx, config.StoreInterval, &memstore)
 	}
-	if filestore.StoreData && !filestore.Synchronize && config.DatabaseDSN != "" {
-		go filestore.IntervalUpdateDB(ctx, config.StoreInterval, &dbstore)
-	}
+	// if filestore.StoreData && !filestore.Synchronize && config.DatabaseDSN != "" {
+	// 	go filestore.IntervalUpdateDB(ctx, config.StoreInterval, &dbstore)
+	// }
 
 	// Start gin engine
 	router := setupGinHandlers()
