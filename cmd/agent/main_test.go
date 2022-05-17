@@ -43,17 +43,17 @@ func Test_sendData(t *testing.T) {
 func TestMetric_collectMemMetrics(t *testing.T) {
 	tests := []struct {
 		name string
-		m    *storage.Storage
+		m    *storage.MemStorage
 	}{
 		{
 			name: "Normal conditions",
-			m:    &storage.Storage{},
+			m:    storage.NewMemStorage(),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.m.CollectMemMetrics()
-			if tt.m.PollCount != 1 {
+			tt.m.CollectRuntimeMetrics()
+			if tt.m.CounterMetrics["PollCount"] != 1 {
 				t.Errorf("PollCount is still zero")
 			}
 		})

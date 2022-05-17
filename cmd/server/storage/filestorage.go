@@ -17,8 +17,26 @@ type FileStorage struct {
 	Synchronize bool
 }
 
-func (f *FileStorage) OpenToWrite(path string) error {
-	var err error
+func NewFileStorage(cfg settings.Config) *FileStorage {
+	fs := new(FileStorage)
+	if cfg.StoreFile == "" {
+		fs.StoreData = false
+		fs.Synchronize = false
+	} else {
+		fs.FilePath = cfg.StoreFile
+		fs.StoreData = true
+	}
+	if cfg.StoreInterval == 0 {
+		fs.Synchronize = true
+	}
+	if cfg.StoreInterval > 0 {
+		fs.Synchronize = false
+	}
+	return fs
+}
+
+
+func (f *FileStorage) OpenToWrite(path string) (err error) {
 	f.File, err = os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
 	if err != nil {
 		return err
@@ -27,55 +45,41 @@ func (f *FileStorage) OpenToWrite(path string) error {
 }
 
 func (f *FileStorage) SaveMemDataToFile(condition bool, m *MemoryStorage) error {
-	if condition {
-		err := f.OpenToWrite(f.FilePath)
-		if err != nil {
-			return err
-		}
-		m.WriteMetricsToFile(f.File)
-		f.File.Close()
+	if !condition {
+		return nil
 	}
+	err := f.OpenToWrite(f.FilePath)
+	if err != nil {
+		return err
+	}
+	m.WriteMetricsToFile(f.File)
+	f.File.Close()
 	return nil
 }
 
 func (f *FileStorage) SaveDBDataToFile(condition bool, d *DBStorage) error {
-	if condition {
-		metrics, err := d.DBReadAll()
-		if err != nil {
-			return err
-		}
-		log.Println("Tried to save db to file on exit", metrics)
-		data, err := json.Marshal(metrics)
-		if err != nil {
-			return err
-		}
-		err = f.OpenToWrite(f.FilePath)
-		if err != nil {
-			return err
-		}
-		_, err = f.File.Write(data)
-		if err != nil {
-			return err
-		}
-		f.File.Close()
+	if !condition {
+		return nil
 	}
+	metrics, err := d.DBReadAll()
+	if err != nil {
+		return err
+	}
+	log.Println("Tried to save db to file on exit", metrics)
+	data, err := json.Marshal(metrics)
+	if err != nil {
+		return err
+	}
+	err = f.OpenToWrite(f.FilePath)
+	if err != nil {
+		return err
+	}
+	_, err = f.File.Write(data)
+	if err != nil {
+		return err
+	}
+	f.File.Close()
 	return nil
-}
-
-func (f *FileStorage) InitFileStorage(cfg settings.Config) {
-	if cfg.StoreFile == "" {
-		f.StoreData = false
-		f.Synchronize = false
-	} else {
-		f.FilePath = cfg.StoreFile
-		f.StoreData = true
-	}
-	if cfg.StoreInterval == 0 {
-		f.Synchronize = true
-	}
-	if cfg.StoreInterval > 0 {
-		f.Synchronize = false
-	}
 }
 
 func (f *FileStorage) IntervalUpdateMem(ctx context.Context, dur time.Duration, s *MemoryStorage) {

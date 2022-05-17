@@ -83,7 +83,7 @@ func main() {
 	log.Println("Running config - ", config)
 
 	// Init file and db storages
-	filestore.InitFileStorage(config)
+	filestore = *storage.NewFileStorage(config)
 	err = dbstore.DBConnectStorage(ctx, config.DatabaseDSN, "rt_metrics")
 	if err != nil {
 		log.Println("DB error : ", err)

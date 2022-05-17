@@ -30,15 +30,15 @@ func sendData(url string, m interface{}, client *resty.Client) error {
 	return err
 }
 
-func reportMetrics(ctx context.Context, cfg *settings.Config, batched bool, s *storage.Storage, wg *sync.WaitGroup) {
+func reportMetrics(ctx context.Context, cfg *settings.Config, s *storage.MemStorage, wg *sync.WaitGroup) {
 	defer wg.Done()
 	client := resty.New()
 	reportTicker := time.NewTicker(cfg.ReportInterval)
 	for {
 		select {
 		case <-reportTicker.C:
-			metricsSlice := s.RebuildDataToJSON(cfg.HashKey)
-			if !batched {
+			metricsSlice := s.ConvertToMetricsJSON(cfg.HashKey)
+			if !cfg.Batched {
 				for _, value := range metricsSlice {
 					select {
 					case <-ctx.Done():
@@ -58,22 +58,53 @@ func reportMetrics(ctx context.Context, cfg *settings.Config, batched bool, s *s
 				}
 			}
 			log.Println("Atempted to report all metrics. Interval", cfg.ReportInterval)
+			log.Println("Atempted to report all metrics. Data", metricsSlice)
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func pollMetrics(ctx context.Context, interval time.Duration, s *storage.Storage, wg *sync.WaitGroup) {
+func pollScheduller(ctx context.Context, c *sync.Cond, t *time.Ticker, wg *sync.WaitGroup) {
 	defer wg.Done()
-	pollTicker := time.NewTicker(interval)
 	for {
 		select {
-		case <-pollTicker.C:
-			s.CollectMemMetrics()
-			log.Println("All runtime memory stats collected. Interval", interval)
+		case <-t.C:
+			c.Broadcast()
 		case <-ctx.Done():
 			return
+		}
+	}
+}
+
+func pollRuntimeMetrics(ctx context.Context, c *sync.Cond, s *storage.MemStorage, wg *sync.WaitGroup) {
+	defer wg.Done()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			c.L.Lock()
+			s.CollectRuntimeMetrics()
+			log.Println("All runtime memory stats collected")
+			c.Wait()
+			c.L.Unlock()
+		}
+	}
+}
+
+func pollPSUtilMetrics(ctx context.Context, c *sync.Cond, s *storage.MemStorage, wg *sync.WaitGroup) {
+	defer wg.Done()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			c.L.Lock()
+			s.CollectPSUtilMetrics()
+			log.Println("All psutil memory stats collected")
+			c.Wait()
+			c.L.Unlock()
 		}
 	}
 }
@@ -94,17 +125,22 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	s := storage.Storage{}
+	ms := storage.NewMemStorage()
 	wg := new(sync.WaitGroup)
 	syscallCancelChan := make(chan os.Signal, 1)
 	ctx, cancel := context.WithCancel(context.Background())
-	wg.Add(2)
+	wg.Add(4)
 
 	signal.Notify(syscallCancelChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
-	go pollMetrics(ctx, config.PollInterval, &s, wg)
-	go reportMetrics(ctx, &config, config.Batched, &s, wg)
+	pollTicker := time.NewTicker(config.PollInterval)
+	c := sync.NewCond(&sync.Mutex{})
+	go pollScheduller(ctx, c, pollTicker, wg)
+	go pollRuntimeMetrics(ctx, c, ms, wg)
+	go pollPSUtilMetrics(ctx, c, ms, wg)
+	go reportMetrics(ctx, &config, ms, wg)
 	sig := <-syscallCancelChan
-	cancel()
 	log.Printf("Caught syscall: %v", sig)
+	cancel()
+	c.Broadcast()
 	wg.Wait()
 }
