@@ -14,6 +14,7 @@ import (
 	"github.com/caarlos0/env"
 	"github.com/go-resty/resty/v2"
 
+	"github.com/dsft54/rt-metrics/cmd/agent/scheduller"
 	"github.com/dsft54/rt-metrics/cmd/agent/settings"
 	"github.com/dsft54/rt-metrics/cmd/agent/storage"
 )
@@ -30,13 +31,20 @@ func sendData(url string, m interface{}, client *resty.Client) error {
 	return err
 }
 
-func reportMetrics(ctx context.Context, cfg *settings.Config, s *storage.MemStorage, wg *sync.WaitGroup) {
+func reportMetrics(ctx context.Context, sch *scheduller.Scheduller, cfg *settings.Config, s *storage.MemStorage, wg *sync.WaitGroup) {
 	defer wg.Done()
 	client := resty.New()
-	reportTicker := time.NewTicker(cfg.ReportInterval)
 	for {
 		select {
-		case <-reportTicker.C:
+		case <-ctx.Done():
+			return
+		default:
+			sch.Rc.L.Lock()
+			sch.Rc.Wait()
+			sch.Rc.L.Unlock()
+			if !sch.Update {
+				return
+			}
 			metricsSlice := s.ConvertToMetricsJSON(cfg.HashKey)
 			if !cfg.Batched {
 				for _, value := range metricsSlice {
@@ -58,9 +66,6 @@ func reportMetrics(ctx context.Context, cfg *settings.Config, s *storage.MemStor
 				}
 			}
 			log.Println("Atempted to report all metrics. Interval", cfg.ReportInterval)
-			log.Println("Atempted to report all metrics. Data", metricsSlice)
-		case <-ctx.Done():
-			return
 		}
 	}
 }
@@ -84,9 +89,9 @@ func pollRuntimeMetrics(ctx context.Context, c *sync.Cond, s *storage.MemStorage
 		case <-ctx.Done():
 			return
 		default:
-			c.L.Lock()
 			s.CollectRuntimeMetrics()
 			log.Println("All runtime memory stats collected")
+			c.L.Lock()
 			c.Wait()
 			c.L.Unlock()
 		}
@@ -100,9 +105,9 @@ func pollPSUtilMetrics(ctx context.Context, c *sync.Cond, s *storage.MemStorage,
 		case <-ctx.Done():
 			return
 		default:
-			c.L.Lock()
 			s.CollectPSUtilMetrics()
 			log.Println("All psutil memory stats collected")
+			c.L.Lock()
 			c.Wait()
 			c.L.Unlock()
 		}
@@ -127,20 +132,19 @@ func main() {
 	}
 	ms := storage.NewMemStorage()
 	wg := new(sync.WaitGroup)
+	sch := scheduller.NewScheduller(&config)
 	syscallCancelChan := make(chan os.Signal, 1)
 	ctx, cancel := context.WithCancel(context.Background())
 	wg.Add(4)
 
 	signal.Notify(syscallCancelChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
-	pollTicker := time.NewTicker(config.PollInterval)
-	c := sync.NewCond(&sync.Mutex{})
-	go pollScheduller(ctx, c, pollTicker, wg)
-	go pollRuntimeMetrics(ctx, c, ms, wg)
-	go pollPSUtilMetrics(ctx, c, ms, wg)
-	go reportMetrics(ctx, &config, ms, wg)
+	go sch.Start(ctx, wg)
+	go pollRuntimeMetrics(ctx, sch.Pc, ms, wg)
+	go pollPSUtilMetrics(ctx, sch.Pc, ms, wg)
+	go reportMetrics(ctx, sch, &config, ms, wg)
 	sig := <-syscallCancelChan
 	log.Printf("Caught syscall: %v", sig)
 	cancel()
-	c.Broadcast()
+	sch.ExitRelease()
 	wg.Wait()
 }
