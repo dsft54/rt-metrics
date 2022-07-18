@@ -91,7 +91,7 @@ func (ms *MemStorage) CollectPSUtilMetrics() error {
 	ms.GaugeMetrics["TotalMemory"] = gauge(v.Total)
 	ms.GaugeMetrics["FreeMemory"] = gauge(v.Free)
 	for i, value := range c {
-		ms.GaugeMetrics["CPUutilization" + strconv.Itoa(i+1)] = gauge(value)
+		ms.GaugeMetrics["CPUutilization"+strconv.Itoa(i+1)] = gauge(value)
 	}
 	ms.Unlock()
 	return nil
