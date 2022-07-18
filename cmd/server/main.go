@@ -30,7 +30,6 @@ func init() {
 		GaugeMetrics:   make(map[string]float64),
 		CounterMetrics: make(map[string]int64),
 	}
-
 	flag.StringVar(&config.Address, "a", "localhost:8080", "Server address")
 	flag.BoolVar(&config.Restore, "r", true, "Restore metrics from file on start")
 	flag.StringVar(&config.StoreFile, "f", "/tmp/devops-metrics-db.json", "Path to file storage")
@@ -39,7 +38,7 @@ func init() {
 	flag.StringVar(&config.DatabaseDSN, "d", "postgres://postgres:example@localhost:5432", "Postgress connection uri")
 }
 
-func setupGinHandlers() *gin.Engine {
+func setupGinRouter() *gin.Engine {
 	router := gin.New()
 	router.Use(
 		gin.Recovery(),
@@ -49,21 +48,21 @@ func setupGinHandlers() *gin.Engine {
 	)
 
 	if dbstore.Connection != nil {
-		router.GET("/", handlers.DBRootHandler(&dbstore))
-		router.GET("/value/:type/:name", handlers.DBAddressedRequest(&dbstore))
-		router.POST("/update/", handlers.DBHandleUpdateJSON(&dbstore, &filestore, config.HashKey))
-		router.POST("/value/", handlers.DBHandleRequestJSON(&dbstore, config.HashKey))
-		router.POST("/updates/", handlers.DBBatchUpdate(&dbstore, &filestore, config.HashKey))
-		router.POST("/update/:type/:name/:value", handlers.DBStringUpdatesHandler(&dbstore, &filestore))
+		router.GET("/", handlers.RequestAllMetrics(&dbstore))
+		router.GET("/value/:type/:name", handlers.AddressedRequest(&dbstore))
+		router.POST("/update/", handlers.UpdateMetricJSON(&dbstore, &filestore, config.HashKey))
+		router.POST("/value/", handlers.RequestMetricJSON(&dbstore, config.HashKey))
+		router.POST("/updates/", handlers.BatchUpdateJSON(&dbstore, &filestore, config.HashKey))
+		router.POST("/update/:type/:name/:value", handlers.ParametersUpdate(&dbstore, &filestore))
 	} else {
-		router.GET("/", handlers.RootHandler(&memstore))
+		router.GET("/", handlers.RequestAllMetrics(&memstore))
 		router.GET("/value/:type/:name", handlers.AddressedRequest(&memstore))
-		router.POST("/update/", handlers.HandleUpdateJSON(&memstore, &filestore, config.HashKey))
-		router.POST("/value/", handlers.HandleRequestJSON(&memstore, config.HashKey))
-		router.POST("/updates/", handlers.BatchUpdate(&memstore, &filestore, config.HashKey))
-		router.POST("/update/:type/:name/:value", handlers.StringUpdatesHandler(&memstore, &filestore))
+		router.POST("/update/", handlers.UpdateMetricJSON(&memstore, &filestore, config.HashKey))
+		router.POST("/value/", handlers.RequestMetricJSON(&memstore, config.HashKey))
+		router.POST("/updates/", handlers.BatchUpdateJSON(&memstore, &filestore, config.HashKey))
+		router.POST("/update/:type/:name/:value", handlers.ParametersUpdate(&memstore, &filestore))
 	}
-	router.GET("/ping", handlers.PingDB(&dbstore))
+	router.GET("/ping", handlers.PingDatabase(&dbstore))
 	router.POST("/update/gauge/", handlers.WithoutID)
 	router.POST("/update/counter/", handlers.WithoutID)
 
@@ -100,26 +99,26 @@ func main() {
 	// Handle file interaction if neccesary
 	if config.Restore {
 		if dbstore.Connection != nil {
-			err := dbstore.ReadOldMetrics(filestore.FilePath)
+			err := dbstore.UploadFromFile(filestore.FilePath)
 			if err != nil {
 				log.Println("(DBStorage) Wanted to restore old metrics from file on server start but failed; ", err)
 			}
 		} else {
-			err := memstore.ReadOldMetrics(filestore.FilePath)
+			err := memstore.UploadFromFile(filestore.FilePath)
 			if err != nil {
 				log.Println("(Memstorage) Wanted to restore old metrics from file on server start but failed; ", err)
 			}
 		}
 	}
 	if filestore.StoreData && !filestore.Synchronize && config.DatabaseDSN == "" {
-		go filestore.IntervalUpdateMem(ctx, config.StoreInterval, &memstore)
+		go filestore.IntervalUpdate(ctx, config.StoreInterval, &memstore)
 	}
 	if filestore.StoreData && !filestore.Synchronize && config.DatabaseDSN != "" {
-		go filestore.IntervalUpdateDB(ctx, config.StoreInterval, &dbstore)
+		go filestore.IntervalUpdate(ctx, config.StoreInterval, &dbstore)
 	}
 
 	// Start gin engine
-	router := setupGinHandlers()
+	router := setupGinRouter()
 	server := &http.Server{
 		Addr:    config.Address,
 		Handler: router,
@@ -141,17 +140,19 @@ func main() {
 	log.Println("Server exiting")
 
 	// Store data in file on exit if condition
-	if dbstore.Connection != nil {
-		err = filestore.SaveDBDataToFile(filestore.StoreData, &dbstore)
-		if err != nil {
-			log.Println("Failed to save data on server exit (DBStorage);", err)
+	if filestore.StoreData {
+		if dbstore.Connection != nil {
+			err = filestore.SaveStorageToFile(&dbstore)
+			if err != nil {
+				log.Println("Failed to save data on server exit (DBStorage);", err)
+			}
+			log.Println("Saved db to file on exit")
+		} else {
+			err = filestore.SaveStorageToFile(&memstore)
+			if err != nil {
+				log.Println("Failed to save data on server exit (MEMStorage);", err)
+			}
+			log.Println("Saved mem to file on exit")
 		}
-		log.Println("Saved db to file on exit")
-	} else {
-		err = filestore.SaveMemDataToFile(filestore.StoreData, &memstore)
-		if err != nil {
-			log.Println("Failed to save data on server exit (MEMStorage);", err)
-		}
-		log.Println("Saved mem to file on exit")
 	}
 }
