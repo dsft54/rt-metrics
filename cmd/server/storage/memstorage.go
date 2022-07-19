@@ -28,7 +28,7 @@ func (m *MemoryStorage) InsertMetric(met *Metrics) error {
 	case "gauge":
 		m.GaugeMetrics[met.ID] = *met.Value
 	case "counter":
-		m.CounterMetrics[met.ID] = *met.Delta
+		m.CounterMetrics[met.ID] += *met.Delta
 	}
 	return nil
 }

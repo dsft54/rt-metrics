@@ -86,7 +86,6 @@ func main() {
 		err := st.UploadFromFile(fs.FilePath)
 		if err != nil {
 			log.Println("Wanted to restore old metrics from file on server start but failed; ", err)
-
 		}
 	}
 	if fs.StoreData && !fs.Synchronize {
