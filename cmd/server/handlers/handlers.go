@@ -78,14 +78,11 @@ func RequestMetricJSON(st storage.Storage, key string) gin.HandlerFunc {
 			c.Status(http.StatusInternalServerError)
 			return
 		}
-		log.Println("Request JSON ----- ", metricsRequest)
 		metricsResponse, err := st.ReadMetric(metricsRequest)
 		if err != nil {
-			log.Println("Request JSON store err", err,"--- request ---" , metricsRequest)
 			c.Status(http.StatusNotFound)
 			return
 		}
-		log.Println("Response JSON ----- ", metricsRequest)
 		if key != "" {
 			h := hmac.New(sha256.New, []byte(key))
 			switch metricsResponse.MType {
