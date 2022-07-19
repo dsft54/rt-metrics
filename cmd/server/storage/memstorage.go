@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	ErrNoDB     = fmt.Errorf("No DB connected")
-	ErrNotFound = fmt.Errorf("Not found in memory storage")
+	errNoDB     = fmt.Errorf("no db connected")
+	errNotFound = fmt.Errorf("not found in memory storage")
 )
 
 type MemoryStorage struct {
@@ -51,13 +51,13 @@ func (m *MemoryStorage) ReadMetric(rm *Metrics) (*Metrics, error) {
 		if value, found := m.GaugeMetrics[rm.ID]; found {
 			rm.Value = &value
 		} else {
-			return nil, ErrNotFound
+			return nil, errNotFound
 		}
 	case "counter":
 		if value, found := m.CounterMetrics[rm.ID]; found {
 			rm.Delta = &value
 		} else {
-			return nil, ErrNotFound
+			return nil, errNotFound
 		}
 	}
 	return rm, nil
@@ -164,5 +164,5 @@ func (m *MemoryStorage) SaveToFile(file *os.File) error {
 }
 
 func (m *MemoryStorage) Ping() error {
-	return ErrNoDB
+	return errNoDB
 }

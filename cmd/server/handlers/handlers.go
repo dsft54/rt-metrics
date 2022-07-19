@@ -114,6 +114,7 @@ func UpdateMetricJSON(st storage.Storage, fs *storage.FileStorage, key string) g
 			c.Status(http.StatusInternalServerError)
 			return
 		}
+		log.Println("Request JSON ----- ", metricsRequest)
 		h := hmac.New(sha256.New, []byte(key))
 		switch metricsRequest.MType {
 		case "gauge":
@@ -124,6 +125,8 @@ func UpdateMetricJSON(st storage.Storage, fs *storage.FileStorage, key string) g
 			c.Status(http.StatusInternalServerError)
 			return
 		}
+		log.Println("Request HASH ----- ", metricsRequest.Hash)
+		log.Println("Request CALCULATED HASH ----- ", hex.EncodeToString(h.Sum(nil)))
 		if metricsRequest.Hash != hex.EncodeToString(h.Sum(nil)) {
 			c.Status(http.StatusBadRequest)
 			return

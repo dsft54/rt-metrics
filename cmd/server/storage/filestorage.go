@@ -41,12 +41,12 @@ func (f *FileStorage) OpenToWrite(path string) (err error) {
 	return nil
 }
 
-func (f *FileStorage) SaveStorageToFile(m Storage) error {
+func (f *FileStorage) SaveStorageToFile(s Storage) error {
 	err := f.OpenToWrite(f.FilePath)
 	if err != nil {
 		return err
 	}
-	m.SaveToFile(f.File)
+	s.SaveToFile(f.File)
 	f.File.Close()
 	return nil
 }
