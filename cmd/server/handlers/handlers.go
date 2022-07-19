@@ -114,22 +114,21 @@ func UpdateMetricJSON(st storage.Storage, fs *storage.FileStorage, key string) g
 			c.Status(http.StatusInternalServerError)
 			return
 		}
-		log.Println("Request JSON ----- ", metricsRequest)
-		h := hmac.New(sha256.New, []byte(key))
-		switch metricsRequest.MType {
-		case "gauge":
-			h.Write([]byte(fmt.Sprintf("%s:gauge:%f", metricsRequest.ID, *metricsRequest.Value)))
-		case "counter":
-			h.Write([]byte(fmt.Sprintf("%s:counter:%d", metricsRequest.ID, *metricsRequest.Delta)))
-		default:
-			c.Status(http.StatusInternalServerError)
-			return
-		}
-		log.Println("Request HASH ----- ", metricsRequest.Hash)
-		log.Println("Request CALCULATED HASH ----- ", hex.EncodeToString(h.Sum(nil)))
-		if metricsRequest.Hash != hex.EncodeToString(h.Sum(nil)) {
-			c.Status(http.StatusBadRequest)
-			return
+		if key != "" {
+			h := hmac.New(sha256.New, []byte(key))
+			switch metricsRequest.MType {
+			case "gauge":
+				h.Write([]byte(fmt.Sprintf("%s:gauge:%f", metricsRequest.ID, *metricsRequest.Value)))
+			case "counter":
+				h.Write([]byte(fmt.Sprintf("%s:counter:%d", metricsRequest.ID, *metricsRequest.Delta)))
+			default:
+				c.Status(http.StatusInternalServerError)
+				return
+			}
+			if metricsRequest.Hash != hex.EncodeToString(h.Sum(nil)) {
+				c.Status(http.StatusBadRequest)
+				return
+			}
 		}
 		err = st.InsertMetric(metricsRequest)
 		if err != nil {
