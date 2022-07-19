@@ -15,7 +15,6 @@ type DBStorage struct {
 	Connection *pgx.Conn
 	ConnConfig pgx.ConnConfig
 	Context    context.Context
-	TableName  string
 }
 
 func (d *DBStorage) InsertMetric(m *Metrics) error {
@@ -173,37 +172,6 @@ func (d *DBStorage) InsertBatchMetric(metrics []Metrics) error {
 	return nil
 }
 
-func (d *DBStorage) DBFlushTable() error {
-	// Empty table
-	_, err := d.Connection.Exec("TRUNCATE rt_metrics;")
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (d *DBStorage) DBSaveToFile(f *FileStorage) error {
-	err := f.OpenToWrite(f.FilePath)
-	if err != nil {
-		return err
-	}
-	metrics, err := d.ReadAllMetrics()
-	if err != nil {
-		return err
-	}
-	data, err := json.Marshal(metrics)
-	if err != nil {
-		return err
-	}
-	_, err = f.File.Write(data)
-	if err != nil {
-		return err
-	}
-	f.File.Close()
-	return nil
-}
-
-
 func (d *DBStorage) Ping() error {
 	err := d.Connection.Ping(d.Context)
 	if err != nil {
@@ -212,7 +180,7 @@ func (d *DBStorage) Ping() error {
 	return nil
 }
 
-func (d *DBStorage) DBConnectStorage(ctx context.Context, auth, tableName string) error {
+func (d *DBStorage) DBConnectStorage(ctx context.Context, auth string) error {
 	var err error
 	if auth == "" {
 		return nil
@@ -225,37 +193,26 @@ func (d *DBStorage) DBConnectStorage(ctx context.Context, auth, tableName string
 	if err != nil {
 		return errors.New("WARNING! DB connection failed")
 	}
-	d.TableName = tableName
+	if d.Connection != nil {
+		_, err := d.Connection.Exec(
+			`CREATE TABLE IF NOT EXISTS rt_metrics (
+				id TEXT UNIQUE,
+				mtype TEXT,
+				delta BIGINT,
+				value DOUBLE PRECISION,
+				hash TEXT
+			);`)
+		if err != nil {
+			return err
+		}
+	}
 	d.Context = ctx
 	return nil
 }
 
-func (d *DBStorage) DBCheckTableExists() error {
-	// Check if table exists
-	row := d.Connection.QueryRow(
-		`SELECT EXISTS (
-			SELECT FROM pg_tables
-			WHERE schemaname = 'public'
-			AND tablename  = rt_metrics
-		);`)
-	var tableExists bool
-	err := row.Scan(&tableExists)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (d *DBStorage) DBCreateTable() error {
-	// Create table
-	_, err := d.Connection.Exec(
-		`CREATE TABLE IF NOT EXISTS rt_metrics (
-			id TEXT UNIQUE,
-			mtype TEXT,
-			delta BIGINT,
-			value DOUBLE PRECISION,
-			hash TEXT
-		);`)
+func (d *DBStorage) DBFlushTable() error {
+	// Empty table
+	_, err := d.Connection.Exec("TRUNCATE rt_metrics;")
 	if err != nil {
 		return err
 	}

@@ -85,13 +85,12 @@ func RequestMetricJSON(st storage.Storage, key string) gin.HandlerFunc {
 			return
 		}
 		if key != "" {
+			h := hmac.New(sha256.New, []byte(key))
 			switch metricsResponse.MType {
 			case "gauge":
-				h := hmac.New(sha256.New, []byte(key))
 				h.Write([]byte(fmt.Sprintf("%s:gauge:%f", metricsResponse.ID, *metricsResponse.Value)))
 				metricsResponse.Hash = hex.EncodeToString(h.Sum(nil))
 			case "counter":
-				h := hmac.New(sha256.New, []byte(key))
 				h.Write([]byte(fmt.Sprintf("%s:counter:%d", metricsResponse.ID, *metricsResponse.Delta)))
 				metricsResponse.Hash = hex.EncodeToString(h.Sum(nil))
 			}
@@ -147,13 +146,9 @@ func UpdateMetricJSON(st storage.Storage, fs *storage.FileStorage, key string) g
 	}
 }
 
-func PingDatabase(db *storage.DBStorage) gin.HandlerFunc {
+func PingDatabase(st storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if db.Connection == nil {
-			c.Status(http.StatusInternalServerError)
-			return
-		}
-		err := db.Ping()
+		err := st.Ping()
 		if err != nil {
 			c.Status(http.StatusInternalServerError)
 			return

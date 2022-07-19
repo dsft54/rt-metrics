@@ -20,4 +20,5 @@ type Storage interface {
 	ReadAllMetrics() ([]Metrics, error)
 	SaveToFile(*os.File) error
 	UploadFromFile(string) error
+	Ping() error
 }

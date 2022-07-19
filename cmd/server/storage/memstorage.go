@@ -10,7 +10,10 @@ import (
 	"sync"
 )
 
-var ErrNotFound = fmt.Errorf("Not found in memory storage")
+var (
+	ErrNoDB     = fmt.Errorf("No DB connected")
+	ErrNotFound = fmt.Errorf("Not found in memory storage")
+)
 
 type MemoryStorage struct {
 	GaugeMetrics   map[string]float64 // хранилище для gauge
@@ -67,7 +70,7 @@ func (m *MemoryStorage) ReadAllMetrics() ([]Metrics, error) {
 	for key, value := range m.GaugeMetrics {
 		metric := Metrics{
 			MType: "gauge",
-			ID: key,
+			ID:    key,
 			Value: &value,
 		}
 		metricsSlice = append(metricsSlice, metric)
@@ -75,7 +78,7 @@ func (m *MemoryStorage) ReadAllMetrics() ([]Metrics, error) {
 	for key, value := range m.CounterMetrics {
 		metric := Metrics{
 			MType: "counter",
-			ID: key,
+			ID:    key,
 			Delta: &value,
 		}
 		metricsSlice = append(metricsSlice, metric)
@@ -158,4 +161,8 @@ func (m *MemoryStorage) SaveToFile(file *os.File) error {
 		return err
 	}
 	return nil
+}
+
+func (m *MemoryStorage) Ping() error {
+	return ErrNoDB
 }
