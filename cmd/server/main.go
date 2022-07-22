@@ -117,7 +117,7 @@ func main() {
 	log.Println("Server exiting")
 
 	// Collect memory profile
-	fmem, err := os.Create(`profiles/mem.profile`)
+	fmem, err := os.Create(`profiles/new_server_mem.profile`)
 	if err != nil {
 		panic(err)
 	}
