@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/caarlos0/env v3.5.0+incompatible
 	github.com/gin-gonic/gin v1.7.7
+	github.com/go-playground/assert v1.2.1
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/jackc/pgx v3.6.2+incompatible
 	github.com/shirou/gopsutil v3.21.11+incompatible

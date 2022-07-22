@@ -24,14 +24,12 @@ func ParametersUpdate(st storage.Storage, fs *storage.FileStorage) gin.HandlerFu
 		if err != nil {
 			log.Println(err, "Type:", mType, "Name:", mName, "Value:", mValue, "Code", code)
 		}
-		if code == 200 {
-			if fs.Synchronize {
-				err := fs.SaveStorageToFile(st)
-				if err != nil {
-					log.Println("Synchronized data saving was failed", err)
-					c.Status(http.StatusInternalServerError)
-					return
-				}
+		if code == 200 && fs.Synchronize {
+			err := fs.SaveStorageToFile(st)
+			if err != nil {
+				log.Println("Synchronized data saving was failed", err)
+				c.Status(http.StatusInternalServerError)
+				return
 			}
 		}
 		c.Status(code)
