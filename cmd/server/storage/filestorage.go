@@ -2,8 +2,6 @@ package storage
 
 import (
 	"context"
-	"encoding/json"
-	"log"
 	"os"
 	"time"
 
@@ -35,7 +33,6 @@ func NewFileStorage(cfg settings.Config) *FileStorage {
 	return fs
 }
 
-
 func (f *FileStorage) OpenToWrite(path string) (err error) {
 	f.File, err = os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
 	if err != nil {
@@ -44,67 +41,24 @@ func (f *FileStorage) OpenToWrite(path string) (err error) {
 	return nil
 }
 
-func (f *FileStorage) SaveMemDataToFile(condition bool, m *MemoryStorage) error {
-	if !condition {
-		return nil
-	}
+func (f *FileStorage) SaveStorageToFile(s Storage) error {
 	err := f.OpenToWrite(f.FilePath)
 	if err != nil {
 		return err
 	}
-	m.WriteMetricsToFile(f.File)
+	s.SaveToFile(f.File)
 	f.File.Close()
 	return nil
 }
 
-func (f *FileStorage) SaveDBDataToFile(condition bool, d *DBStorage) error {
-	if !condition {
-		return nil
-	}
-	metrics, err := d.DBReadAll()
-	if err != nil {
-		return err
-	}
-	log.Println("Tried to save db to file on exit", metrics)
-	data, err := json.Marshal(metrics)
-	if err != nil {
-		return err
-	}
-	err = f.OpenToWrite(f.FilePath)
-	if err != nil {
-		return err
-	}
-	_, err = f.File.Write(data)
-	if err != nil {
-		return err
-	}
-	f.File.Close()
-	return nil
-}
-
-func (f *FileStorage) IntervalUpdateMem(ctx context.Context, dur time.Duration, s *MemoryStorage) {
+func (f *FileStorage) IntervalUpdate(ctx context.Context, dur time.Duration, s Storage) {
 	intervalTicker := time.NewTicker(dur)
 	for {
 		select {
 		case <-intervalTicker.C:
 			f.OpenToWrite(f.FilePath)
-			s.WriteMetricsToFile(f.File)
+			s.SaveToFile(f.File)
 			f.File.Close()
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-func (f *FileStorage) IntervalUpdateDB(ctx context.Context, dur time.Duration, db *DBStorage) {
-	intervalTicker := time.NewTicker(dur)
-	for {
-		select {
-		case <-intervalTicker.C:
-			err := db.DBSaveToFile(f)
-			if err != nil {
-				log.Print("Failed to save metrics from db to file with ticker", err)
-			}
 		case <-ctx.Done():
 			return
 		}

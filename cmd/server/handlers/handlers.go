@@ -14,19 +14,19 @@ import (
 	"github.com/dsft54/rt-metrics/cmd/server/storage"
 )
 
-func DBStringUpdatesHandler(db *storage.DBStorage, fs *storage.FileStorage) gin.HandlerFunc {
+func ParametersUpdate(st storage.Storage, fs *storage.FileStorage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var code int
 		mType := c.Param("type")
 		mName := c.Param("name")
 		mValue := c.Param("value")
-		code, err := db.DBUpdateValueFromParams(mType, mName, mValue)
+		code, err := st.ParamsUpdate(mType, mName, mValue)
 		if err != nil {
-			log.Println(err, "Type:", mType, "Name:", mName, "Value:", mValue, "Code:", code)
+			log.Println(err, "Type:", mType, "Name:", mName, "Value:", mValue, "Code", code)
 		}
 		if code == 200 {
 			if fs.Synchronize {
-				err = db.DBSaveToFile(fs)
+				err := fs.SaveStorageToFile(st)
 				if err != nil {
 					log.Println("Synchronized data saving was failed", err)
 					c.Status(http.StatusInternalServerError)
@@ -38,7 +38,7 @@ func DBStringUpdatesHandler(db *storage.DBStorage, fs *storage.FileStorage) gin.
 	}
 }
 
-func DBAddressedRequest(db *storage.DBStorage) gin.HandlerFunc {
+func AddressedRequest(st storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rType := c.Param("type")
 		rID := c.Param("name")
@@ -46,7 +46,7 @@ func DBAddressedRequest(db *storage.DBStorage) gin.HandlerFunc {
 			ID:    rID,
 			MType: rType,
 		}
-		metricsResponse, err := db.DBReadSpecific(&metricsRequest)
+		metricsResponse, err := st.ReadMetric(&metricsRequest)
 		if err != nil {
 			c.Status(http.StatusNotFound)
 			return
@@ -63,7 +63,7 @@ func DBAddressedRequest(db *storage.DBStorage) gin.HandlerFunc {
 	}
 }
 
-func DBHandleRequestJSON(db *storage.DBStorage, key string) gin.HandlerFunc {
+func RequestMetricJSON(st storage.Storage, key string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rawData, err := c.GetRawData()
 		if err != nil {
@@ -78,20 +78,18 @@ func DBHandleRequestJSON(db *storage.DBStorage, key string) gin.HandlerFunc {
 			c.Status(http.StatusInternalServerError)
 			return
 		}
-		metricsResponse, err := db.DBReadSpecific(metricsRequest)
+		metricsResponse, err := st.ReadMetric(metricsRequest)
 		if err != nil {
-			log.Println(err)
 			c.Status(http.StatusNotFound)
 			return
 		}
 		if key != "" {
+			h := hmac.New(sha256.New, []byte(key))
 			switch metricsResponse.MType {
 			case "gauge":
-				h := hmac.New(sha256.New, []byte(key))
 				h.Write([]byte(fmt.Sprintf("%s:gauge:%f", metricsResponse.ID, *metricsResponse.Value)))
 				metricsResponse.Hash = hex.EncodeToString(h.Sum(nil))
 			case "counter":
-				h := hmac.New(sha256.New, []byte(key))
 				h.Write([]byte(fmt.Sprintf("%s:counter:%d", metricsResponse.ID, *metricsResponse.Delta)))
 				metricsResponse.Hash = hex.EncodeToString(h.Sum(nil))
 			}
@@ -100,7 +98,7 @@ func DBHandleRequestJSON(db *storage.DBStorage, key string) gin.HandlerFunc {
 	}
 }
 
-func DBHandleUpdateJSON(db *storage.DBStorage, fs *storage.FileStorage, key string) gin.HandlerFunc {
+func UpdateMetricJSON(st storage.Storage, fs *storage.FileStorage, key string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rawData, err := c.GetRawData()
 		if err != nil {
@@ -115,40 +113,30 @@ func DBHandleUpdateJSON(db *storage.DBStorage, fs *storage.FileStorage, key stri
 			c.Status(http.StatusInternalServerError)
 			return
 		}
-		switch metricsRequest.MType {
-		case "gauge":
-			if key != "" {
-				h := hmac.New(sha256.New, []byte(key))
+		if key != "" {
+			h := hmac.New(sha256.New, []byte(key))
+			switch metricsRequest.MType {
+			case "gauge":
 				h.Write([]byte(fmt.Sprintf("%s:gauge:%f", metricsRequest.ID, *metricsRequest.Value)))
-				if metricsRequest.Hash != hex.EncodeToString(h.Sum(nil)) {
-					c.Status(http.StatusBadRequest)
-					return
-				}
-			}
-			err = db.DBInsertGauge(metricsRequest)
-			if err != nil {
-				log.Println("INSERT GAUGE ERR", err)
+			case "counter":
+				h.Write([]byte(fmt.Sprintf("%s:counter:%d", metricsRequest.ID, *metricsRequest.Delta)))
+			default:
 				c.Status(http.StatusInternalServerError)
 				return
 			}
-		case "counter":
-			if key != "" {
-				h := hmac.New(sha256.New, []byte(key))
-				h.Write([]byte(fmt.Sprintf("%s:counter:%d", metricsRequest.ID, *metricsRequest.Delta)))
-				if metricsRequest.Hash != hex.EncodeToString(h.Sum(nil)) {
-					c.Status(http.StatusBadRequest)
-					return
-				}
-			}
-			err = db.DBInsertCounter(metricsRequest)
-			if err != nil {
-				log.Println("INSERT COUNTER ERR", err)
-				c.Status(http.StatusInternalServerError)
+			if metricsRequest.Hash != hex.EncodeToString(h.Sum(nil)) {
+				c.Status(http.StatusBadRequest)
 				return
 			}
 		}
+		err = st.InsertMetric(metricsRequest)
+		if err != nil {
+			log.Println("Insert metric err", err)
+			c.Status(http.StatusInternalServerError)
+			return
+		}
 		if fs.Synchronize {
-			err = db.DBSaveToFile(fs)
+			err = fs.SaveStorageToFile(st)
 			if err != nil {
 				log.Println("Synchronized data saving was failed", err)
 				c.Status(http.StatusInternalServerError)
@@ -159,13 +147,9 @@ func DBHandleUpdateJSON(db *storage.DBStorage, fs *storage.FileStorage, key stri
 	}
 }
 
-func PingDB(db *storage.DBStorage) gin.HandlerFunc {
+func PingDatabase(st storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if db.Connection == nil {
-			c.Status(http.StatusInternalServerError)
-			return
-		}
-		err := db.Ping()
+		err := st.Ping()
 		if err != nil {
 			c.Status(http.StatusInternalServerError)
 			return
@@ -174,9 +158,9 @@ func PingDB(db *storage.DBStorage) gin.HandlerFunc {
 	}
 }
 
-func DBRootHandler(db *storage.DBStorage) gin.HandlerFunc {
+func RequestAllMetrics(st storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		metrics, err := db.DBReadAll()
+		metrics, err := st.ReadAllMetrics()
 		if err != nil {
 			c.Status(http.StatusInternalServerError)
 			return
@@ -190,7 +174,7 @@ func DBRootHandler(db *storage.DBStorage) gin.HandlerFunc {
 	}
 }
 
-func DBBatchUpdate(db *storage.DBStorage, fs *storage.FileStorage, key string) gin.HandlerFunc {
+func BatchUpdateJSON(st storage.Storage, fs *storage.FileStorage, key string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rawData, err := c.GetRawData()
 		if err != nil {
@@ -208,33 +192,28 @@ func DBBatchUpdate(db *storage.DBStorage, fs *storage.FileStorage, key string) g
 		metricsBatchClean := []storage.Metrics{}
 		if key != "" {
 			for _, metric := range metricsBatch {
+				h := hmac.New(sha256.New, []byte(key))
 				switch metric.MType {
 				case "gauge":
-					h := hmac.New(sha256.New, []byte(key))
 					h.Write([]byte(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value)))
-					if metric.Hash != hex.EncodeToString(h.Sum(nil)) {
-						continue
-					}
-					metricsBatchClean = append(metricsBatchClean, metric)
 				case "counter":
-					h := hmac.New(sha256.New, []byte(key))
 					h.Write([]byte(fmt.Sprintf("%s:counter:%d", metric.ID, *metric.Delta)))
-					if metric.Hash != hex.EncodeToString(h.Sum(nil)) {
-						continue
-					}
-					metricsBatchClean = append(metricsBatchClean, metric)
 				}
+				if metric.Hash != hex.EncodeToString(h.Sum(nil)) {
+					continue
+				}
+				metricsBatchClean = append(metricsBatchClean, metric)
 			}
 			metricsBatch = metricsBatchClean
 		}
-		err = db.DBBatchQuery(metricsBatch)
+		err = st.InsertBatchMetric(metricsBatch)
 		if err != nil {
 			log.Println("Error while update metrics from batch", err)
 			c.Status(http.StatusInternalServerError)
 			return
 		}
 		if fs.Synchronize {
-			err = db.DBSaveToFile(fs)
+			err = fs.SaveStorageToFile(st)
 			if err != nil {
 				log.Println("Synchronized data saving was failed", err)
 				c.Status(http.StatusInternalServerError)
@@ -243,4 +222,8 @@ func DBBatchUpdate(db *storage.DBStorage, fs *storage.FileStorage, key string) g
 		}
 		c.Status(http.StatusOK)
 	}
+}
+
+func WithoutID(c *gin.Context) {
+	c.Status(http.StatusNotFound)
 }

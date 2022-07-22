@@ -3,27 +3,90 @@ package storage
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"strconv"
 	"sync"
 )
 
-type Metrics struct {
-	ID    string   `json:"id"`              // имя метрики
-	MType string   `json:"type"`            // параметр, принимающий значение gauge или counter
-	Delta *int64   `json:"delta,omitempty"` // значение метрики в случае передачи counter
-	Value *float64 `json:"value,omitempty"` // значение метрики в случае передачи gauge
-	Hash  string   `json:"hash,omitempty"`  // значение хеш-функции
-}
+var (
+	errNoDB     = fmt.Errorf("no db connected")
+	errNotFound = fmt.Errorf("not found in memory storage")
+)
 
 type MemoryStorage struct {
 	GaugeMetrics   map[string]float64 // хранилище для gauge
 	CounterMetrics map[string]int64   // хранилище для counter
-	mutex          sync.Mutex
+	mutex          sync.RWMutex
 }
 
-func (m *MemoryStorage) UpdateMetricsFromString(metricType, metricName, metricValue string) (int, error) {
+func (m *MemoryStorage) InsertMetric(met *Metrics) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	switch met.MType {
+	case "gauge":
+		m.GaugeMetrics[met.ID] = *met.Value
+	case "counter":
+		m.CounterMetrics[met.ID] += *met.Delta
+	}
+	return nil
+}
+
+func (m *MemoryStorage) InsertBatchMetric(metrics []Metrics) error {
+	for _, metric := range metrics {
+		err := m.InsertMetric(&metric)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *MemoryStorage) ReadMetric(rm *Metrics) (*Metrics, error) {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	switch rm.MType {
+	case "gauge":
+		if value, found := m.GaugeMetrics[rm.ID]; found {
+			rm.Value = &value
+		} else {
+			return nil, errNotFound
+		}
+	case "counter":
+		if value, found := m.CounterMetrics[rm.ID]; found {
+			rm.Delta = &value
+		} else {
+			return nil, errNotFound
+		}
+	}
+	return rm, nil
+}
+
+func (m *MemoryStorage) ReadAllMetrics() ([]Metrics, error) {
+	metricsSlice := []Metrics{}
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	for key, value := range m.GaugeMetrics {
+		metric := Metrics{
+			MType: "gauge",
+			ID:    key,
+			Value: &value,
+		}
+		metricsSlice = append(metricsSlice, metric)
+	}
+	for key, value := range m.CounterMetrics {
+		metric := Metrics{
+			MType: "counter",
+			ID:    key,
+			Delta: &value,
+		}
+		metricsSlice = append(metricsSlice, metric)
+	}
+	return metricsSlice, nil
+}
+
+func (m *MemoryStorage) ParamsUpdate(metricType, metricName, metricValue string) (int, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	switch metricType {
@@ -46,7 +109,7 @@ func (m *MemoryStorage) UpdateMetricsFromString(metricType, metricName, metricVa
 	}
 }
 
-func (m *MemoryStorage) ReadOldMetrics(path string) error {
+func (m *MemoryStorage) UploadFromFile(path string) error {
 	var metricsSlice []Metrics
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -69,10 +132,10 @@ func (m *MemoryStorage) ReadOldMetrics(path string) error {
 	return nil
 }
 
-func (m *MemoryStorage) WriteMetricsToFile(file *os.File) error {
+func (m *MemoryStorage) SaveToFile(file *os.File) error {
 	var metricsSlice []Metrics
-
 	m.mutex.Lock()
+	defer m.mutex.Unlock()
 	for key, value := range m.GaugeMetrics {
 		v := value
 		metricsSlice = append(metricsSlice, Metrics{
@@ -89,8 +152,6 @@ func (m *MemoryStorage) WriteMetricsToFile(file *os.File) error {
 			Delta: &v,
 		})
 	}
-	m.mutex.Unlock()
-
 	data, err := json.Marshal(metricsSlice)
 	if err != nil {
 		return err
@@ -100,4 +161,8 @@ func (m *MemoryStorage) WriteMetricsToFile(file *os.File) error {
 		return err
 	}
 	return nil
+}
+
+func (m *MemoryStorage) Ping() error {
+	return errNoDB
 }
