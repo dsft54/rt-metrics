@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
+	"runtime/pprof"
 	"syscall"
 	"time"
 
@@ -139,6 +141,17 @@ func main() {
 		log.Fatal("Server Shutdown:", err)
 	}
 	log.Println("Server exiting")
+
+	// Collect memory profile
+	fmem, err := os.Create(`profiles/mem.profile`)
+	if err != nil {
+		panic(err)
+	}
+	defer fmem.Close()
+	runtime.GC()
+	if err := pprof.WriteHeapProfile(fmem); err != nil {
+		panic(err)
+	}
 
 	// Store data in file on exit if condition
 	if dbstore.Connection != nil {
