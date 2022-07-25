@@ -26,10 +26,10 @@ func NewFileStorage(cfg settings.Config) *FileStorage {
 	if cfg.StoreFile == "" {
 		fs.StoreData = false
 		fs.Synchronize = false
-	} else {
-		fs.FilePath = cfg.StoreFile
-		fs.StoreData = true
+		return fs
 	}
+	fs.FilePath = cfg.StoreFile
+	fs.StoreData = true
 	if cfg.StoreInterval == 0 {
 		fs.Synchronize = true
 	}

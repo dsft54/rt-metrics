@@ -16,12 +16,19 @@ type Metrics struct {
 
 // IStorage интерфейс описывающий хранище метрик и методы для работы с ним.
 type IStorage interface {
+	// Write/Insert methods.
 	InsertMetric(*Metrics) error
 	InsertBatchMetric([]Metrics) error
 	ParamsUpdate(string, string, string) (int, error)
+
+	// Read methods.
 	ReadMetric(*Metrics) (*Metrics, error)
 	ReadAllMetrics() ([]Metrics, error)
+	
+	// File storage methods.
 	SaveToFile(*os.File) error
 	UploadFromFile(string) error
+
+	// DB healthcheck.
 	Ping() error
 }

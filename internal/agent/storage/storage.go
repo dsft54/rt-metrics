@@ -46,6 +46,7 @@ var memstats runtime.MemStats
 func (ms *MemStorage) CollectRuntimeMetrics() {
 	runtime.ReadMemStats(&memstats)
 	ms.Lock()
+	defer ms.Unlock()
 	ms.GaugeMetrics["Alloc"] = gauge(memstats.Alloc)
 	ms.GaugeMetrics["BuckHashSys"] = gauge(memstats.BuckHashSys)
 	ms.GaugeMetrics["Frees"] = gauge(memstats.Frees)
@@ -75,7 +76,6 @@ func (ms *MemStorage) CollectRuntimeMetrics() {
 	ms.GaugeMetrics["TotalAlloc"] = gauge(memstats.TotalAlloc)
 	ms.GaugeMetrics["RandomValue"] = gauge(rand.Float64())
 	ms.CounterMetrics["PollCount"] += 1
-	ms.Unlock()
 }
 
 func (ms *MemStorage) CollectPSUtilMetrics() error {
