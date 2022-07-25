@@ -2,10 +2,12 @@ package storage
 
 import (
 	"io/ioutil"
+	"os"
 	"reflect"
 	"testing"
 
 	"github.com/dsft54/rt-metrics/config/server/settings"
+	"github.com/go-playground/assert"
 )
 
 func TestNewFileStorage(t *testing.T) {
@@ -77,11 +79,6 @@ func TestNewFileStorage(t *testing.T) {
 }
 
 func TestFileStorage_OpenToWrite(t *testing.T) {
-	tf, err := ioutil.TempFile("./", "test")
-	defer tf.Close()
-	if err != nil {
-		t.Error(err)
-	}
 	tests := []struct {
 		name    string
 		f       *FileStorage
@@ -106,7 +103,61 @@ func TestFileStorage_OpenToWrite(t *testing.T) {
 			if err := tt.f.OpenToWrite(tt.path); (err != nil) != tt.wantErr {
 				t.Errorf("FileStorage.OpenToWrite() error = %v, wantErr %v", err, tt.wantErr)
 			}
+			if tt.path != "" {
+				err := tt.f.File.Close()
+				if err != nil {
+					t.Error(err)
+				}
+				err = os.Remove(tt.f.File.Name())
+				if err != nil {
+					t.Error(err)
+				}
+			}
 		})
 	}
-	
+}
+
+func TestFileStorage_SaveStorageToFile(t *testing.T) {
+	tests := []struct {
+		name       string
+		f          *FileStorage
+		s          IStorage
+		wantInFile string
+		wantErr    bool
+	}{
+		{
+			name: "Save memstorage",
+			f: &FileStorage{
+				FilePath: "test",
+			},
+			s: &MemoryStorage{
+				GaugeMetrics: map[string]float64{
+					"Alloc": 3.14,
+				},
+				CounterMetrics: map[string]int64{
+					"Counter": 3,
+				},
+			},
+			wantInFile: "[{\"id\":\"Alloc\",\"type\":\"gauge\",\"value\":3.14},{\"id\":\"Counter\",\"type\":\"counter\",\"delta\":3}]",
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.f.SaveStorageToFile(tt.s); (err != nil) != tt.wantErr {
+				t.Errorf("FileStorage.SaveStorageToFile() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			data, err := ioutil.ReadFile(tt.f.FilePath)
+			if err != nil {
+				t.Error(err)
+			}
+			if tt.f.FilePath != "" {
+				err = os.Remove(tt.f.FilePath)
+				if err != nil {
+					t.Error(err)
+				}
+			}
+			assert.Equal(t, tt.wantInFile, string(data))
+		})
+	}
 }

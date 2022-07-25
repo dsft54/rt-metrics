@@ -51,11 +51,14 @@ func (f *FileStorage) OpenToWrite(path string) (err error) {
 // SaveStorageToFile сохраняет текущий активный storage в файл.
 func (f *FileStorage) SaveStorageToFile(s IStorage) error {
 	err := f.OpenToWrite(f.FilePath)
+	defer f.File.Close()
 	if err != nil {
 		return err
 	}
-	s.SaveToFile(f.File)
-	f.File.Close()
+	err = s.SaveToFile(f.File)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

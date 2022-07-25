@@ -70,18 +70,6 @@ func reportMetrics(ctx context.Context, sch *scheduller.Scheduller, cfg *setting
 	}
 }
 
-func pollScheduller(ctx context.Context, c *sync.Cond, t *time.Ticker, wg *sync.WaitGroup) {
-	defer wg.Done()
-	for {
-		select {
-		case <-t.C:
-			c.Broadcast()
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
 func pollRuntimeMetrics(ctx context.Context, c *sync.Cond, s *storage.MemStorage, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for {
