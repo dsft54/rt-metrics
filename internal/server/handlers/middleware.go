@@ -15,10 +15,12 @@ type gzipBodyWriter struct {
 	writer io.Writer
 }
 
+// Write подготавливает writer для его передачи после обработчика.
 func (gz gzipBodyWriter) Write(b []byte) (int, error) {
 	return gz.writer.Write(b)
 }
 
+// Compression middleware - сжимает тело запроса/ответа и передает дальше по цепочке обработчиков.
 func Compression() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !strings.Contains(c.Request.Header.Get("Accept-Encoding"), "gzip") {
@@ -39,6 +41,7 @@ func Compression() gin.HandlerFunc {
 	}
 }
 
+// Decompression middleware - распаковывает тело запроса/ответа и передает дальше по цепочке обработчиков.
 func Decompression() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !strings.Contains(c.Request.Header.Get("Content-Encoding"), "gzip") ||

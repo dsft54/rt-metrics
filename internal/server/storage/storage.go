@@ -4,6 +4,8 @@ import (
 	"os"
 )
 
+// Metrics преобразуемая в json структура, которая может содержать
+// тип метрики, её название, значение и хеш
 type Metrics struct {
 	ID    string   `json:"id"`
 	MType string   `json:"type"`
@@ -12,7 +14,8 @@ type Metrics struct {
 	Hash  string   `json:"hash,omitempty"`
 }
 
-type Storage interface {
+// IStorage интерфейс описывающий хранище метрик и методы для работы с ним.
+type IStorage interface {
 	InsertMetric(*Metrics) error
 	InsertBatchMetric([]Metrics) error
 	ParamsUpdate(string, string, string) (int, error)

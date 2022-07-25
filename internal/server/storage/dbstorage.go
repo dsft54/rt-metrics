@@ -11,12 +11,16 @@ import (
 	"github.com/jackc/pgx"
 )
 
+// DBStorage - структура реализующая интерфейс IStorage, которая содержит в себе подключение к БД, конфигурацию этого подключения
+// и переданный ей контекст.
 type DBStorage struct {
 	Connection *pgx.Conn
 	ConnConfig pgx.ConnConfig
 	Context    context.Context
 }
 
+// InsertMetric исполняет sql запрос к бд добавляющий или обновляющий (при конфликте) значение метрики типа gauge
+// или counter. Данные метрики получаются из аргумента - структуры Metrics.
 func (d *DBStorage) InsertMetric(m *Metrics) error {
 	switch m.MType {
 	case "gauge":
@@ -43,8 +47,8 @@ func (d *DBStorage) InsertMetric(m *Metrics) error {
 	return nil
 }
 
+// ReadAllMetrics запрос всех метрик из базы, который возвращает список структур Metric
 func (d *DBStorage) ReadAllMetrics() ([]Metrics, error) {
-	// Read all metrics from db
 	var metricsSlice []Metrics
 	rows, err := d.Connection.Query("SELECT * FROM rt_metrics;")
 	if err != nil {
@@ -65,6 +69,8 @@ func (d *DBStorage) ReadAllMetrics() ([]Metrics, error) {
 	return metricsSlice, nil
 }
 
+// ParamsUpdate работает как и InsertMetric, за тем исключением, что параметры для обновления
+// будут получены из аргументов функции (строк)
 func (d *DBStorage) ParamsUpdate(metricType, metricID, metricValue string) (int, error) {
 	switch metricType {
 	case "gauge":
@@ -101,6 +107,7 @@ func (d *DBStorage) ParamsUpdate(metricType, metricID, metricValue string) (int,
 	return 501, errors.New("Wrong metric type - " + metricType)
 }
 
+// SaveToFile читает все метрики из базы, а затем сохраняет их в файл (аргумент функции).
 func (d *DBStorage) SaveToFile(f *os.File) error {
 	metrics, err := d.ReadAllMetrics()
 	if err != nil {
@@ -117,6 +124,7 @@ func (d *DBStorage) SaveToFile(f *os.File) error {
 	return nil
 }
 
+// UploadFromFile заполняет базу метрик значениями, полученными из файла.
 func (d *DBStorage) UploadFromFile(path string) error {
 	var metricsSlice []Metrics
 	data, err := ioutil.ReadFile(path)
@@ -148,7 +156,8 @@ func (d *DBStorage) UploadFromFile(path string) error {
 	}
 	return nil
 }
-
+ 
+// ReadMetric sql запрос в базу для получения значения метрики, тип и название которой получены из структуры Metrics.
 func (d *DBStorage) ReadMetric(rm *Metrics) (*Metrics, error) {
 	// Read specific metric from db
 	row := d.Connection.QueryRow(
@@ -162,6 +171,7 @@ func (d *DBStorage) ReadMetric(rm *Metrics) (*Metrics, error) {
 	return rm, nil
 }
 
+// InsertBatchMetric запросы на обновление метрик в цикле, полученных из списка []Metrics методом InsertMetric.
 func (d *DBStorage) InsertBatchMetric(metrics []Metrics) error {
 	for _, metric := range metrics {
 		err := d.InsertMetric(&metric)
@@ -172,6 +182,7 @@ func (d *DBStorage) InsertBatchMetric(metrics []Metrics) error {
 	return nil
 }
 
+// Ping проверка состояния подключения бд встроенным в pgx.Connection методом.
 func (d *DBStorage) Ping() error {
 	err := d.Connection.Ping(d.Context)
 	if err != nil {
@@ -180,6 +191,9 @@ func (d *DBStorage) Ping() error {
 	return nil
 }
 
+// DBConnectStorage парсит строку для подключения к базе и пытается к ней подключиться. 
+// В случае успеха, создает таблицу rt_metrics, если она не существует и принимает переданный
+// в качестве аргумента функции контекст.
 func (d *DBStorage) DBConnectStorage(ctx context.Context, auth string) error {
 	var err error
 	if auth == "" {
@@ -210,6 +224,7 @@ func (d *DBStorage) DBConnectStorage(ctx context.Context, auth string) error {
 	return nil
 }
 
+// DBFlushTable очищает таблицу rt_metrics.
 func (d *DBStorage) DBFlushTable() error {
 	// Empty table
 	_, err := d.Connection.Exec("TRUNCATE rt_metrics;")

@@ -15,12 +15,16 @@ var (
 	errNotFound = fmt.Errorf("not found in memory storage")
 )
 
+// MemoryStorage структура, состоящая из двух массивов для двух типов метрик gauge и counter,
+// а также RWMutex для конкурентного доступа к ним. Реализует интерфейсный тип IStorage.
 type MemoryStorage struct {
 	GaugeMetrics   map[string]float64 // хранилище для gauge
 	CounterMetrics map[string]int64   // хранилище для counter
 	mutex          sync.RWMutex
 }
 
+// InsertMetric потокобезопасно добавляет значения полученные из аргумента Metrics в массивы.
+// Для gauge заменяет существующий, для counter добавляет к уже существующему значению в базе.
 func (m *MemoryStorage) InsertMetric(met *Metrics) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -33,6 +37,8 @@ func (m *MemoryStorage) InsertMetric(met *Metrics) error {
 	return nil
 }
 
+// InsertBatchMetric в цикле выполняет InsertMetric из значений, полученных в качестве аргумента
+// в виде списка []Metrics.
 func (m *MemoryStorage) InsertBatchMetric(metrics []Metrics) error {
 	for _, metric := range metrics {
 		err := m.InsertMetric(&metric)
@@ -43,6 +49,8 @@ func (m *MemoryStorage) InsertBatchMetric(metrics []Metrics) error {
 	return nil
 }
 
+// ReadMetric потокобезопасно получает значение искомой метрики и возвращает в виде структуры Metrics.
+// В случае если искомой метрики не существует, возвращает nil и ошибку.
 func (m *MemoryStorage) ReadMetric(rm *Metrics) (*Metrics, error) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
@@ -63,6 +71,8 @@ func (m *MemoryStorage) ReadMetric(rm *Metrics) (*Metrics, error) {
 	return rm, nil
 }
 
+// ReadAllMetrics потокобезопасно получает значение всех метрик и возвращает в виде списка структур []Metrics.
+// В случае если метрик неn, возвращает пустой список и nil.
 func (m *MemoryStorage) ReadAllMetrics() ([]Metrics, error) {
 	metricsSlice := []Metrics{}
 	m.mutex.RLock()
@@ -86,6 +96,9 @@ func (m *MemoryStorage) ReadAllMetrics() ([]Metrics, error) {
 	return metricsSlice, nil
 }
 
+// ParamsUpdate потокобезопасно добавляет значения полученные из строчных аргументов в массивы.
+// Для gauge заменяет существующий, для counter добавляет к уже существующему значению в базе.
+// А также возвращает код, в зависимости от успешности операции для передачи его в handler.
 func (m *MemoryStorage) ParamsUpdate(metricType, metricName, metricValue string) (int, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -109,6 +122,8 @@ func (m *MemoryStorage) ParamsUpdate(metricType, metricName, metricValue string)
 	}
 }
 
+// UploadFromFile потокобезопасно заполняет массивы метриками, полученными
+// из файла по пути.
 func (m *MemoryStorage) UploadFromFile(path string) error {
 	var metricsSlice []Metrics
 	m.mutex.Lock()
@@ -132,6 +147,7 @@ func (m *MemoryStorage) UploadFromFile(path string) error {
 	return nil
 }
 
+// SaveToFile сохраняет значения метрик в файл, собирая их в список структур Metrics.
 func (m *MemoryStorage) SaveToFile(file *os.File) error {
 	var metricsSlice []Metrics
 	m.mutex.Lock()
@@ -163,6 +179,7 @@ func (m *MemoryStorage) SaveToFile(file *os.File) error {
 	return nil
 }
 
+// Ping всегда возвращает ошибку. Необходим для реализации интерфейса.
 func (m *MemoryStorage) Ping() error {
 	return errNoDB
 }

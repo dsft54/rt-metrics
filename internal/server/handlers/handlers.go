@@ -10,11 +10,14 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-
-	"github.com/dsft54/rt-metrics/cmd/server/storage"
+	
+	"github.com/dsft54/rt-metrics/internal/server/storage"
 )
 
-func ParametersUpdate(st storage.Storage, fs *storage.FileStorage) gin.HandlerFunc {
+// ParametersUpdate используется для обработки POST запроса для обновления/записи
+// метрики с использованием параметров в url запроса в формате "/update/:type/:name/:value".
+// Если требуется синхронная запись в файл, она осуществляется через метод FileStorage.
+func ParametersUpdate(st storage.IStorage, fs *storage.FileStorage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var code int
 		mType := c.Param("type")
@@ -36,7 +39,9 @@ func ParametersUpdate(st storage.Storage, fs *storage.FileStorage) gin.HandlerFu
 	}
 }
 
-func AddressedRequest(st storage.Storage) gin.HandlerFunc {
+// AddressedRequest используется для обработки GET запроса на получение одной метрики,
+// тип и название которой будет получено из параметров url запроса вида "/value/:type/:name".
+func AddressedRequest(st storage.IStorage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rType := c.Param("type")
 		rID := c.Param("name")
@@ -61,7 +66,9 @@ func AddressedRequest(st storage.Storage) gin.HandlerFunc {
 	}
 }
 
-func RequestMetricJSON(st storage.Storage, key string) gin.HandlerFunc {
+// RequestMetricJSON используется для обработки POST запроса на получения одной метрики,
+// где тип и название метрики передается в теле запроса в формате json по url /value/.
+func RequestMetricJSON(st storage.IStorage, key string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rawData, err := c.GetRawData()
 		if err != nil {
@@ -96,7 +103,12 @@ func RequestMetricJSON(st storage.Storage, key string) gin.HandlerFunc {
 	}
 }
 
-func UpdateMetricJSON(st storage.Storage, fs *storage.FileStorage, key string) gin.HandlerFunc {
+// UpdateMetricJSON используется для обработки POST запроса на обновление/запись одной метрики,
+// где тип, название и значение метрики передается в теле запроса в формате json по url /update/.
+// В случае если при запуске сервера был указан ключ, считается хеш полученной метрики и сравнивается
+// с тем, который был получен от агента. При неравенстве хешей такой запрос отбрасывается.
+// При необходимости запись дублируется в файл.
+func UpdateMetricJSON(st storage.IStorage, fs *storage.FileStorage, key string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rawData, err := c.GetRawData()
 		if err != nil {
@@ -145,7 +157,9 @@ func UpdateMetricJSON(st storage.Storage, fs *storage.FileStorage, key string) g
 	}
 }
 
-func PingDatabase(st storage.Storage) gin.HandlerFunc {
+// PingDatabase обработчик GET запросов, который позволяет проверить состояние подключения к базе данных по пути /ping/,
+// если активное хранилище развенуто в памяти, вернет ошибку.
+func PingDatabase(st storage.IStorage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		err := st.Ping()
 		if err != nil {
@@ -156,7 +170,9 @@ func PingDatabase(st storage.Storage) gin.HandlerFunc {
 	}
 }
 
-func RequestAllMetrics(st storage.Storage) gin.HandlerFunc {
+// RequestAllMetrics возвращает значения всех сохраненных метрик в json формате. Предназначен для обработки GET запроса
+// на /.
+func RequestAllMetrics(st storage.IStorage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		metrics, err := st.ReadAllMetrics()
 		if err != nil {
@@ -172,7 +188,9 @@ func RequestAllMetrics(st storage.Storage) gin.HandlerFunc {
 	}
 }
 
-func BatchUpdateJSON(st storage.Storage, fs *storage.FileStorage, key string) gin.HandlerFunc {
+// BatchUpdateJSON предназначен для обновления списка метрик полученных в теле POST запроса
+// в формате json. Также проверяется хеш при наличии ключа. При необходимости запись дублируется в файл.
+func BatchUpdateJSON(st storage.IStorage, fs *storage.FileStorage, key string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rawData, err := c.GetRawData()
 		if err != nil {
@@ -222,6 +240,8 @@ func BatchUpdateJSON(st storage.Storage, fs *storage.FileStorage, key string) gi
 	}
 }
 
+// WithoutID возвращает ошибку 404 при попытке сделать POST запрос на "/update/counter/" и "/update/value/"
+// т.е. без указания названия искомой метрики.
 func WithoutID(c *gin.Context) {
 	c.Status(http.StatusNotFound)
 }

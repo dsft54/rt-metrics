@@ -13,10 +13,10 @@ import (
 
 	"github.com/caarlos0/env"
 	"github.com/go-resty/resty/v2"
-
-	"github.com/dsft54/rt-metrics/cmd/agent/scheduller"
-	"github.com/dsft54/rt-metrics/cmd/agent/settings"
-	"github.com/dsft54/rt-metrics/cmd/agent/storage"
+	
+	"github.com/dsft54/rt-metrics/config/agent/settings"
+	"github.com/dsft54/rt-metrics/internal/agent/scheduller"
+	"github.com/dsft54/rt-metrics/internal/agent/storage"
 )
 
 func sendData(url string, m interface{}, client *resty.Client) error {

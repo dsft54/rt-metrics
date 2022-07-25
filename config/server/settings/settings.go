@@ -1,7 +1,9 @@
+// Модуль setting определяет структуру параметров сервера
 package settings
 
 import "time"
 
+// Config - структура описывающая основные настройки сервера. Принимает переменные окружения и флаги. 
 type Config struct {
 	Address       string        `env:"ADDRESS"`
 	StoreInterval time.Duration `env:"STORE_INTERVAL"`

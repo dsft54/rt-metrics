@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dsft54/rt-metrics/cmd/agent/settings"
+	"github.com/dsft54/rt-metrics/config/agent/settings"
 )
 
 type Scheduller struct {

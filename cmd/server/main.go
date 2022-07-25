@@ -14,15 +14,17 @@ import (
 
 	"github.com/caarlos0/env"
 	"github.com/gin-gonic/gin"
-
-	"github.com/dsft54/rt-metrics/cmd/server/handlers"
-	"github.com/dsft54/rt-metrics/cmd/server/settings"
-	"github.com/dsft54/rt-metrics/cmd/server/storage"
+	
+	"github.com/dsft54/rt-metrics/config/server/settings"
+	"github.com/dsft54/rt-metrics/internal/server/handlers"
+	"github.com/dsft54/rt-metrics/internal/server/storage"
 )
 
 var config settings.Config
 
-func initStorages(ctx context.Context, config settings.Config) (storage.Storage, *storage.FileStorage) {
+// initStorages в зависимости от успеха подключения к бд выбирает активный storage, куда будут сохраняться метрики,
+// а также создает файловое хранище на основе настроек сервера.
+func initStorages(ctx context.Context, config settings.Config) (storage.IStorage, *storage.FileStorage) {
 	// Init file and db storages
 	filestore := storage.NewFileStorage(config)
 	dbstore := new(storage.DBStorage)
@@ -41,7 +43,8 @@ func initStorages(ctx context.Context, config settings.Config) (storage.Storage,
 	return &memstore, filestore
 }
 
-func setupGinRouter(st storage.Storage, fs *storage.FileStorage) *gin.Engine {
+// setupGinRouter создает *gin.Engine определяя работу маршрутизатора и используемое middleware.
+func setupGinRouter(st storage.IStorage, fs *storage.FileStorage) *gin.Engine {
 	router := gin.New()
 	router.Use(
 		gin.Recovery(),
@@ -61,6 +64,7 @@ func setupGinRouter(st storage.Storage, fs *storage.FileStorage) *gin.Engine {
 	return router
 }
 
+// init определяет используемые флаги командной строки для настройки запуска сервера.
 func init() {
 	flag.StringVar(&config.Address, "a", "localhost:8080", "Server address")
 	flag.BoolVar(&config.Restore, "r", true, "Restore metrics from file on start")
