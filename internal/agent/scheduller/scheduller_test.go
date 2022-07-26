@@ -2,7 +2,6 @@ package scheduller
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"sync"
 	"testing"
@@ -62,31 +61,31 @@ func wrapWait(wg *sync.WaitGroup) <-chan struct{} {
 	return out
 }
 
-func TestScheduller_ExitRelease(t *testing.T) {
-	tsch := &Scheduller{
-		Rc: sync.NewCond(&sync.Mutex{}),
-		Pc: sync.NewCond(&sync.Mutex{}),
-	}
-	wrapChan := wrapSync(tsch)
-	select {
-	case <-wrapChan:
-		// Ok
-	case <-time.NewTimer(500 * time.Millisecond).C:
-		t.Fail()
-	}
-}
+// func TestScheduller_ExitRelease(t *testing.T) {
+// 	tsch := &Scheduller{
+// 		Rc: sync.NewCond(&sync.Mutex{}),
+// 		Pc: sync.NewCond(&sync.Mutex{}),
+// 	}
+// 	wrapChan := wrapSync(tsch)
+// 	select {
+// 	case <-wrapChan:
+// 		// Ok
+// 	case <-time.NewTimer(500 * time.Millisecond).C:
+// 		t.Fail()
+// 	}
+// }
 
-func wrapSync(sch *Scheduller) <-chan struct{} {
-	go func() {
-		<-time.NewTimer(200 * time.Millisecond).C
-		fmt.Println("Should be released")
-		sch.ExitRelease()
-	}()
-	out := make(chan struct{})
-	sch.Rc.L.Lock()
-	defer sch.Rc.L.Unlock()
-	sch.Rc.Wait()
-	fmt.Println("-------------------------------------------------Should be released")
-	out <- struct{}{}
-	return out
-}
+// func wrapSync(sch *Scheduller) <-chan struct{} {
+// 	go func() {
+// 		<-time.NewTimer(200 * time.Millisecond).C
+// 		fmt.Println("Should be released")
+// 		sch.ExitRelease()
+// 	}()
+// 	out := make(chan struct{})
+// 	sch.Rc.L.Lock()
+// 	defer sch.Rc.L.Unlock()
+// 	sch.Rc.Wait()
+// 	fmt.Println("-------------------------------------------------Should be released")
+// 	out <- struct{}{}
+// 	return out
+// }

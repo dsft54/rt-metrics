@@ -1,3 +1,5 @@
+// Модуль storage определяет структуры их методы, предназначенные для описания хранилища текущего значения метрик,
+// из которого они будут отправлены на сервер. 
 package storage
 
 import (
@@ -19,6 +21,7 @@ type (
 	counter int64
 )
 
+// Metrics json совместимая структура для отправки метрик POST запросом штучно или списком.
 type Metrics struct {
 	ID    string   `json:"id"`              // имя метрики
 	MType string   `json:"type"`            // параметр, принимающий значение gauge или counter
@@ -27,12 +30,15 @@ type Metrics struct {
 	Hash  string   `json:"hash,omitempty"`  // значение хеш-функции
 }
 
+// MemStorage хранилище в памяти состоящее из массивов двух типов и мьютекса для потокобезопасного
+// обращения к ним.
 type MemStorage struct {
 	sync.RWMutex
 	GaugeMetrics   map[string]gauge
 	CounterMetrics map[string]counter
 }
 
+// NewMemStorage функция конструктор, инициализирующая массивы структуры MemStorage.
 func NewMemStorage() *MemStorage {
 	ms := MemStorage{
 		GaugeMetrics:   make(map[string]gauge),
@@ -41,9 +47,9 @@ func NewMemStorage() *MemStorage {
 	return &ms
 }
 
-var memstats runtime.MemStats
-
+// CollectRuntimeMetrics определяет основные метрики для отправки (27 из 33 возвращаемых runtime.ReadMemStats).
 func (ms *MemStorage) CollectRuntimeMetrics() {
+	var memstats runtime.MemStats
 	runtime.ReadMemStats(&memstats)
 	ms.Lock()
 	defer ms.Unlock()
@@ -78,6 +84,8 @@ func (ms *MemStorage) CollectRuntimeMetrics() {
 	ms.CounterMetrics["PollCount"] += 1
 }
 
+// CollectPSUtilMetrics дополнительный набор метрик, который будет собираться в другой горутине.
+// Собирается загрузка процессора и утилизация памяти.
 func (ms *MemStorage) CollectPSUtilMetrics() error {
 	v, err := mem.VirtualMemory()
 	if err != nil {
@@ -97,6 +105,8 @@ func (ms *MemStorage) CollectPSUtilMetrics() error {
 	return nil
 }
 
+// ConvertToMetricsJSON преобразует все имеющиеся метрики в хранилище в список json
+// совместимых структур Metrics, при наличии ключа, также считает хеш.
 func (ms *MemStorage) ConvertToMetricsJSON(hkey string) []Metrics {
 	metricsSlice := []Metrics{}
 	ms.RLock()
@@ -126,6 +136,8 @@ func (ms *MemStorage) ConvertToMetricsJSON(hkey string) []Metrics {
 	return metricsSlice
 }
 
+// ConvertToURLParams преобразует все имеющиеся метрики в хранилище в список строк вида
+// /тип/название/значение для их дальнейшей отправки на сервер.
 func (ms *MemStorage) ConvertToURLParams() []string {
 	urlsList := []string{}
 	ms.RLock()

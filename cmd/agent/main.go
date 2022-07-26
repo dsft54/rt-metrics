@@ -19,6 +19,8 @@ import (
 	"github.com/dsft54/rt-metrics/internal/agent/storage"
 )
 
+// sendData собирает json в массив байт, и отправляет его при помощи resty.Client на
+// url в теле POST запроса.
 func sendData(url string, m interface{}, client *resty.Client) error {
 	rawData, err := json.Marshal(m)
 	if err != nil {
@@ -31,6 +33,8 @@ func sendData(url string, m interface{}, client *resty.Client) error {
 	return err
 }
 
+// reportMetrics ожидает либо выхода по контексту, либо бродкаста на переменную состояния. Во втором
+// случае отправляет метрики на сервер либо штучно, либо списком.
 func reportMetrics(ctx context.Context, sch *scheduller.Scheduller, cfg *settings.Config, s *storage.MemStorage, wg *sync.WaitGroup) {
 	defer wg.Done()
 	client := resty.New()
@@ -70,6 +74,8 @@ func reportMetrics(ctx context.Context, sch *scheduller.Scheduller, cfg *setting
 	}
 }
 
+// pollRuntimeMetrics ожидает либо выхода по контексту, либо бродкаста на переменную состояния. Во втором случае
+// собирает в хранилище в памяти Runtime Metrics.
 func pollRuntimeMetrics(ctx context.Context, c *sync.Cond, s *storage.MemStorage, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for {
@@ -86,6 +92,8 @@ func pollRuntimeMetrics(ctx context.Context, c *sync.Cond, s *storage.MemStorage
 	}
 }
 
+// pollPSUtilMetrics ожидает либо выхода по контексту, либо бродкаста на переменную состояния. Во втором случае
+// собирает в хранилище в памяти метрики процессора и памяти.
 func pollPSUtilMetrics(ctx context.Context, c *sync.Cond, s *storage.MemStorage, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for {

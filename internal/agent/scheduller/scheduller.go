@@ -1,3 +1,4 @@
+// Модуль scheduller определяет планировщик для сборки данных работы системы.
 package scheduller
 
 import (
@@ -8,6 +9,8 @@ import (
 	"github.com/dsft54/rt-metrics/config/agent/settings"
 )
 
+// Scheduller состоит из двух тикеров poll и report и двух переменных состояния Pc и Rc. 
+// А также логической переменной update, которая определяет необходимость очередного сбора метрик.
 type Scheduller struct {
 	poll   *time.Ticker
 	rept   *time.Ticker
@@ -16,6 +19,7 @@ type Scheduller struct {
 	Update bool
 }
 
+// NewScheduller функция-конструктор, которая формирует новый экземпляр Scheduller на основе конфигурации агента.
 func NewScheduller(cfg *settings.Config) *Scheduller {
 	sch := new(Scheduller)
 	sch.poll = time.NewTicker(cfg.PollInterval)
@@ -26,6 +30,8 @@ func NewScheduller(cfg *settings.Config) *Scheduller {
 	return sch
 }
 
+// Start основная функция, определяющая работу планировщика. Ожидание срабатывания тикера и запускает бродкаст в 
+// связанной с ним переменной состояния. Выход по context.Done, с вычитанием waitgroup.
 func (sch *Scheduller) Start(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for {
@@ -40,6 +46,7 @@ func (sch *Scheduller) Start(ctx context.Context, wg *sync.WaitGroup) {
 	}
 }
 
+// ExitRelease принудительный бродкаст по всем переменным состояния. Нужен для корректного выхода при завершении агента.
 func (sch *Scheduller) ExitRelease() {
 	sch.Pc.Broadcast()
 	sch.Rc.Broadcast()
