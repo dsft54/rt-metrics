@@ -142,8 +142,7 @@ func TestMemoryStorage_ReadMetric(t *testing.T) {
 }
 
 func TestMemoryStorage_ReadAllMetrics(t *testing.T) {
-	var d int64
-	d = 3
+	var d int64 = 3
 	v := 3.14
 	tests := []struct {
 		name    string
