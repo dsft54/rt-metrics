@@ -12,8 +12,8 @@ import (
 
 func TestNewScheduller(t *testing.T) {
 	tests := []struct {
-		name string
 		cfg  *settings.Config
+		name string
 		want bool
 	}{
 		{

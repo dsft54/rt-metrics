@@ -1,4 +1,4 @@
-// Модуль storage определяет структуры их методы, предназначенные для описания хранилища текущего значения метрик,
+// Package storage определяет структуры их методы, предназначенные для описания хранилища текущего значения метрик,
 // из которого они будут отправлены на сервер. 
 package storage
 
@@ -33,9 +33,9 @@ type Metrics struct {
 // MemStorage хранилище в памяти состоящее из массивов двух типов и мьютекса для потокобезопасного
 // обращения к ним.
 type MemStorage struct {
-	sync.RWMutex
 	GaugeMetrics   map[string]gauge
 	CounterMetrics map[string]counter
+	sync.RWMutex
 }
 
 // NewMemStorage функция конструктор, инициализирующая массивы структуры MemStorage.

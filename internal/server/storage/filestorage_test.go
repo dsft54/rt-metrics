@@ -12,9 +12,9 @@ import (
 
 func TestNewFileStorage(t *testing.T) {
 	tests := []struct {
+		want *FileStorage
 		name string
 		cfg  settings.Config
-		want *FileStorage
 	}{
 		{
 			name: "No path, no restore",

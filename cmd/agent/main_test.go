@@ -42,8 +42,8 @@ func Test_sendData(t *testing.T) {
 
 func TestMetric_collectMemMetrics(t *testing.T) {
 	tests := []struct {
-		name string
 		m    *storage.MemStorage
+		name string
 	}{
 		{
 			name: "Normal conditions",

@@ -11,10 +11,10 @@ import (
 func TestMemoryStorage_InsertMetric(t *testing.T) {
 	var v float64
 	tests := []struct {
-		name      string
 		m         *MemoryStorage
-		met       *Metrics
 		wantMemSt *MemoryStorage
+		met       *Metrics
+		name      string
 		wantErr   bool
 	}{
 		{
@@ -53,10 +53,10 @@ func TestMemoryStorage_InsertBatchMetric(t *testing.T) {
 		d int64
 	)
 	tests := []struct {
-		name      string
 		m         *MemoryStorage
-		metrics   []Metrics
 		wantMemSt *MemoryStorage
+		name      string
+		metrics   []Metrics
 		wantErr   bool
 	}{
 		{
@@ -101,10 +101,10 @@ func TestMemoryStorage_InsertBatchMetric(t *testing.T) {
 func TestMemoryStorage_ReadMetric(t *testing.T) {
 	v := 3.14
 	tests := []struct {
-		name    string
 		m       *MemoryStorage
 		rm      *Metrics
 		want    *Metrics
+		name    string
 		wantErr bool
 	}{
 		{
@@ -191,13 +191,13 @@ func TestMemoryStorage_ReadAllMetrics(t *testing.T) {
 
 func TestMemoryStorage_ParamsUpdate(t *testing.T) {
 	tests := []struct {
-		name        string
 		m           *MemoryStorage
+		wantMemSt   *MemoryStorage
+		name        string
 		metricType  string
 		metricName  string
 		metricValue string
 		want        int
-		wantMemSt   *MemoryStorage
 		wantErr     bool
 	}{
 		{
@@ -276,10 +276,10 @@ func TestMemoryStorage_UploadFromFile(t *testing.T) {
 		t.Error(err)
 	}
 	tests := []struct {
-		name      string
 		m         *MemoryStorage
-		path      string
 		wantMemSt *MemoryStorage
+		name      string
+		path      string
 		wantErr   bool
 	}{
 		{
@@ -302,7 +302,7 @@ func TestMemoryStorage_UploadFromFile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.m.UploadFromFile(tt.path); (err != nil) != tt.wantErr {
+			if err = tt.m.UploadFromFile(tt.path); (err != nil) != tt.wantErr {
 				t.Errorf("MemoryStorage.UploadFromFile() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			assert.Equal(t, tt.m, tt.wantMemSt)
@@ -362,8 +362,8 @@ func TestMemoryStorage_SaveToFile(t *testing.T) {
 
 func TestMemoryStorage_Ping(t *testing.T) {
 	tests := []struct {
-		name    string
 		m       *MemoryStorage
+		name    string
 		wantErr bool
 	}{
 		{
