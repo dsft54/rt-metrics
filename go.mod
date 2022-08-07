@@ -5,7 +5,6 @@ go 1.18
 require (
 	github.com/caarlos0/env v3.5.0+incompatible
 	github.com/gin-gonic/gin v1.7.7
-	github.com/go-critic/go-critic v0.6.3
 	github.com/go-playground/assert v1.2.1
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/jackc/pgx v3.6.2+incompatible
@@ -21,13 +20,6 @@ require (
 	github.com/go-playground/locales v0.13.0 // indirect
 	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/go-playground/validator/v10 v10.4.1 // indirect
-	github.com/go-toolsmith/astcast v1.0.0 // indirect
-	github.com/go-toolsmith/astcopy v1.0.0 // indirect
-	github.com/go-toolsmith/astequal v1.0.1 // indirect
-	github.com/go-toolsmith/astfmt v1.0.0 // indirect
-	github.com/go-toolsmith/astp v1.0.0 // indirect
-	github.com/go-toolsmith/strparse v1.0.0 // indirect
-	github.com/go-toolsmith/typep v1.0.2 // indirect
 	github.com/gofrs/uuid v4.2.0+incompatible // indirect
 	github.com/golang/protobuf v1.3.3 // indirect
 	github.com/jackc/fake v0.0.0-20150926172116-812a484cc733 // indirect
@@ -38,10 +30,6 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421 // indirect
 	github.com/modern-go/reflect2 v0.0.0-20180701023420-4b7aa43c6742 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/quasilyte/go-ruleguard v0.3.16-0.20220213074421-6aa060fab41a // indirect
-	github.com/quasilyte/gogrep v0.0.0-20220120141003-628d8b3623b5 // indirect
-	github.com/quasilyte/regex/syntax v0.0.0-20200407221936-30656e2c4a95 // indirect
-	github.com/quasilyte/stdinfo v0.0.0-20220114132959-f7386bf02567 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/stretchr/testify v1.7.1 // indirect
 	github.com/tklauser/go-sysconf v0.3.10 // indirect
