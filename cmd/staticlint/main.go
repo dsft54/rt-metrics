@@ -49,13 +49,13 @@ import (
 	"golang.org/x/tools/go/analysis/passes/unusedresult"
 	"golang.org/x/tools/go/analysis/passes/unusedwrite"
 	"golang.org/x/tools/go/analysis/passes/usesgenerics"
+	"honnef.co/go/tools/quickfix"
+	"honnef.co/go/tools/simple"
 	"honnef.co/go/tools/staticcheck"
+	"honnef.co/go/tools/stylecheck"
 )
 
-var (
-	analyserPool []*analysis.Analyzer
-	mode         = flag.String("mode", "all", "builtin - for passes analizers, static - for staticcheck, exits - for os.Exit in main, all by default")
-)
+var mode = flag.String("mode", "all", "builtin - for passes analizers, static - for staticcheck, exits - for os.Exit in main, all by default")
 
 func addBuiltinPasses(aP []*analysis.Analyzer) []*analysis.Analyzer {
 	passes := []*analysis.Analyzer{
@@ -106,13 +106,21 @@ func addBuiltinPasses(aP []*analysis.Analyzer) []*analysis.Analyzer {
 }
 
 func addStaticCheck(aP []*analysis.Analyzer) []*analysis.Analyzer {
-	checks := map[string]bool{
-		"S1000":  true,
-		"ST1000": true,
-		"QF1000": true,
-	}
 	for _, v := range staticcheck.Analyzers {
-		if strings.Contains(v.Analyzer.Name, "SA") || checks[v.Analyzer.Name] {
+		aP = append(aP, v.Analyzer)
+	}
+	for _, v := range simple.Analyzers {
+		if strings.Contains(v.Analyzer.Name, "S1000") {
+			aP = append(aP, v.Analyzer)
+		}
+	}
+	for _, v := range stylecheck.Analyzers {
+		if strings.Contains(v.Analyzer.Name, "ST1000") {
+			aP = append(aP, v.Analyzer)
+		}
+	}
+	for _, v := range quickfix.Analyzers {
+		if strings.Contains(v.Analyzer.Name, "QF1001") {
 			aP = append(aP, v.Analyzer)
 		}
 	}
@@ -153,9 +161,9 @@ func addCustomCheck(aP []*analysis.Analyzer) []*analysis.Analyzer {
 	return aP
 }
 
-func init() {
+func main() {
 	flag.Parse()
-	analyserPool = make([]*analysis.Analyzer, 0)
+	analyserPool := make([]*analysis.Analyzer, 0)
 	switch *mode {
 	case "all":
 		analyserPool = addBuiltinPasses(analyserPool)
@@ -168,9 +176,6 @@ func init() {
 	case "exits":
 		analyserPool = addCustomCheck(analyserPool)
 	}
-}
-
-func main() {
 	multichecker.Main(
 		analyserPool...,
 	)
