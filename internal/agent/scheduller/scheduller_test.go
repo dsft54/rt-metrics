@@ -61,31 +61,46 @@ func wrapWait(wg *sync.WaitGroup) <-chan struct{} {
 	return out
 }
 
-// func TestScheduller_ExitRelease(t *testing.T) {
-// 	tsch := &Scheduller{
-// 		Rc: sync.NewCond(&sync.Mutex{}),
-// 		Pc: sync.NewCond(&sync.Mutex{}),
-// 	}
-// 	wrapChan := wrapSync(tsch)
-// 	select {
-// 	case <-wrapChan:
-// 		// Ok
-// 	case <-time.NewTimer(500 * time.Millisecond).C:
-// 		t.Fail()
-// 	}
-// }
+func TestScheduller_ExitRelease(t *testing.T) {
+	tests := []struct {
+		name string
+		sch  *Scheduller
+	}{
+		{
+			name: "release test",
+			sch: NewScheduller(&settings.Config{
+				ReportInterval: 1,
+				PollInterval:   1,
+			}),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			go func() {
+				<-time.NewTimer(100 * time.Millisecond).C
+				tt.sch.ExitRelease()
 
-// func wrapSync(sch *Scheduller) <-chan struct{} {
-// 	go func() {
-// 		<-time.NewTimer(200 * time.Millisecond).C
-// 		fmt.Println("Should be released")
-// 		sch.ExitRelease()
-// 	}()
-// 	out := make(chan struct{})
-// 	sch.Rc.L.Lock()
-// 	defer sch.Rc.L.Unlock()
-// 	sch.Rc.Wait()
-// 	fmt.Println("-------------------------------------------------Should be released")
-// 	out <- struct{}{}
-// 	return out
-// }
+			}()
+			go func() {
+				<-time.NewTimer(200 * time.Millisecond).C
+				tt.sch.ExitRelease()
+
+			}()
+			go func() {
+				<-time.NewTimer(1000 * time.Millisecond).C
+				tt.sch.Pc.Signal()
+				tt.sch.Rc.Signal()
+				t.Error("Timeout")
+			}()
+			tt.sch.Pc.L.Lock()
+			tt.sch.Pc.Wait()
+			tt.sch.Pc.L.Unlock()
+			tt.sch.Rc.L.Lock()
+			tt.sch.Rc.Wait()
+			tt.sch.Rc.L.Unlock()
+			if tt.sch.Update != false {
+				t.Errorf("Scheduller not working")
+			}
+		})
+	}
+}

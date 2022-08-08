@@ -57,3 +57,22 @@ func Test_addStaticCheck(t *testing.T) {
 		})
 	}
 }
+
+func Test_addCustomCheck(t *testing.T) {
+	tests := []struct {
+		name string
+		aP   []*analysis.Analyzer
+	}{
+		{
+			name: "normal deep equal",
+			aP:   []*analysis.Analyzer{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := addCustomCheck(tt.aP); len(got) <= 0 {
+				t.Error("Builtin passes cannot be picked", got)
+			}
+		})
+	}
+}
