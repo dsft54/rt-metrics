@@ -1,11 +1,15 @@
 package main
 
 import (
+	"context"
+	"sync"
 	"testing"
+	"time"
 
-	"github.com/go-resty/resty/v2"
-
+	"github.com/dsft54/rt-metrics/config/agent/settings"
+	"github.com/dsft54/rt-metrics/internal/agent/scheduller"
 	"github.com/dsft54/rt-metrics/internal/agent/storage"
+	"github.com/go-resty/resty/v2"
 )
 
 func Test_sendData(t *testing.T) {
@@ -40,21 +44,180 @@ func Test_sendData(t *testing.T) {
 	}
 }
 
-func TestMetric_collectMemMetrics(t *testing.T) {
+func Test_reportMetrics(t *testing.T) {
 	tests := []struct {
-		m    *storage.MemStorage
+		ctx  context.Context
+		sch  *scheduller.Scheduller
+		cfg  *settings.Config
+		s    *storage.MemStorage
+		wg   *sync.WaitGroup
 		name string
 	}{
 		{
-			name: "Normal conditions",
-			m:    storage.NewMemStorage(),
+			name: "context exit",
+			sch: scheduller.NewScheduller(&settings.Config{
+				PollInterval:   1,
+				ReportInterval: 1,
+			}),
+			cfg: &settings.Config{
+				PollInterval:   1,
+				ReportInterval: 1,
+			},
+			s:  storage.NewMemStorage(),
+			wg: new(sync.WaitGroup),
+		},
+		{
+			name: "do not update",
+			sch: scheduller.NewScheduller(&settings.Config{
+				PollInterval:   1,
+				ReportInterval: 1,
+			}),
+			cfg: &settings.Config{
+				PollInterval:   1,
+				ReportInterval: 1,
+			},
+			s:  storage.NewMemStorage(),
+			wg: new(sync.WaitGroup),
+		},
+		{
+			name: "normal",
+			sch: scheduller.NewScheduller(&settings.Config{
+				PollInterval:   1,
+				ReportInterval: 1,
+			}),
+			cfg: &settings.Config{
+				PollInterval:   1,
+				ReportInterval: 1,
+			},
+			s:  storage.NewMemStorage(),
+			wg: new(sync.WaitGroup),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.m.CollectRuntimeMetrics()
-			if tt.m.CounterMetrics["PollCount"] != 1 {
-				t.Errorf("PollCount is still zero")
+			switch tt.name {
+			case "context exit":
+				var cancel context.CancelFunc
+				tt.wg.Add(1)
+				tt.ctx, cancel = context.WithCancel(context.Background())
+				go reportMetrics(tt.ctx, tt.sch, tt.cfg, tt.s, tt.wg)
+				cancel()
+				select {
+				case <-time.NewTimer(500 * time.Millisecond).C:
+					t.Error("Goroutine timeout error")
+				case <-wrapWait(tt.wg):
+					t.Log("Ok")
+				}
+			case "do not update":
+				tt.ctx = context.Background()
+				tt.wg.Add(1)
+				tt.sch.Update = false
+				go reportMetrics(tt.ctx, tt.sch, tt.cfg, tt.s, tt.wg)
+				<-time.NewTimer(500 * time.Millisecond).C
+				tt.sch.Rc.Broadcast()
+				select {
+				case <-time.NewTimer(500 * time.Millisecond).C:
+					t.Error("Goroutine timeout error")
+				case <-wrapWait(tt.wg):
+					t.Log("Ok")
+				}
+			case "normal":
+				// just should be stdout
+				var cancel context.CancelFunc
+				tt.wg.Add(1)
+				tt.ctx, cancel = context.WithCancel(context.Background())
+				go reportMetrics(tt.ctx, tt.sch, tt.cfg, tt.s, tt.wg)
+				<-time.NewTimer(1000 * time.Millisecond).C
+				tt.sch.Rc.Broadcast()
+				cancel()
+				select {
+				case <-time.NewTimer(3000 * time.Millisecond).C:
+					t.Error("Goroutine timeout error")
+				case <-wrapWait(tt.wg):
+					t.Log("Ok")
+				}
+			}
+		})
+	}
+}
+
+// helper function to allow using WaitGroup in a select
+func wrapWait(wg *sync.WaitGroup) <-chan struct{} {
+	out := make(chan struct{})
+	go func() {
+		wg.Wait()
+		out <- struct{}{}
+	}()
+	return out
+}
+
+func Test_pollRuntimeMetrics(t *testing.T) {
+	tests := []struct {
+		ctx  context.Context
+		c    *sync.Cond
+		s    *storage.MemStorage
+		wg   *sync.WaitGroup
+		name string
+	}{
+		{
+			name: "context exit, data collected",
+			c:    sync.NewCond(&sync.Mutex{}),
+			s:    storage.NewMemStorage(),
+			wg:   new(sync.WaitGroup),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var cancel context.CancelFunc
+			tt.wg.Add(1)
+			tt.ctx, cancel = context.WithCancel(context.Background())
+			go pollRuntimeMetrics(tt.ctx, tt.c, tt.s, tt.wg)
+			<-time.NewTimer(100 * time.Millisecond).C
+			tt.c.Broadcast()
+			cancel()
+			select {
+			case <-time.NewTimer(500 * time.Millisecond).C:
+				t.Error("Goroutine timeout error")
+			case <-wrapWait(tt.wg):
+				if _, ok := tt.s.GaugeMetrics["Alloc"]; !ok {
+					t.Error("Failed to collect data")
+				}
+			}
+		})
+	}
+}
+
+func Test_pollPSUtilMetrics(t *testing.T) {
+	tests := []struct {
+		ctx context.Context
+		c   *sync.Cond
+		s   *storage.MemStorage
+		wg  *sync.WaitGroup
+		name string
+	}{
+		{
+			name: "context exit, data collected",
+			c:    sync.NewCond(&sync.Mutex{}),
+			s:    storage.NewMemStorage(),
+			wg:   new(sync.WaitGroup),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var cancel context.CancelFunc
+			tt.wg.Add(1)
+			tt.ctx, cancel = context.WithCancel(context.Background())
+			go pollPSUtilMetrics(tt.ctx, tt.c, tt.s, tt.wg)
+			<-time.NewTimer(100 * time.Millisecond).C
+			tt.c.Broadcast()
+			cancel()
+			select {
+			case <-time.NewTimer(500 * time.Millisecond).C:
+				t.Error("Goroutine timeout error")
+			case <-wrapWait(tt.wg):
+				if _, ok := tt.s.GaugeMetrics["TotalMemory"]; !ok {
+					t.Error("Failed to collect data")
+				}
 			}
 		})
 	}

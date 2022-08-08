@@ -74,7 +74,16 @@ func init() {
 	flag.StringVar(&config.DatabaseDSN, "d", "postgres://postgres:example@localhost:5432", "Postgress connection uri")
 }
 
+var (
+	buildVersion string = "N/A"
+	buildDate    string = "N/A"
+	buildCommit  string = "N/A"
+)
+
 func main() {
+	log.Println("Build version:", buildVersion)
+	log.Println("Build date:", buildDate)
+	log.Println("Build commit:", buildCommit)
 	// Init syscall channel, ctx, stores, parse flags and os vars
 	syscallCancelChan := make(chan os.Signal, 1)
 	ctx, cancel := context.WithCancel(context.Background())

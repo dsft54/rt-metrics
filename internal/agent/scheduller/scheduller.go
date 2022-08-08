@@ -19,7 +19,8 @@ type Scheduller struct {
 	Update bool
 }
 
-// NewScheduller функция-конструктор, которая формирует новый экземпляр Scheduller на основе конфигурации агента.
+// NewScheduller функция-конструктор, которая формирует новый экземпляр Scheduller на основе конфигурации агента,
+// а именно его PollInterval и ReportInterval.
 func NewScheduller(cfg *settings.Config) *Scheduller {
 	sch := new(Scheduller)
 	sch.poll = time.NewTicker(cfg.PollInterval)

@@ -54,8 +54,8 @@ func TestNewMemStorage(t *testing.T) {
 
 func TestMemStorage_CollectRuntimeMetrics(t *testing.T) {
 	tests := []struct {
-		name string
 		ms   *MemStorage
+		name string
 	}{
 		{
 			name: "normal conditions test",
@@ -74,8 +74,8 @@ func TestMemStorage_CollectRuntimeMetrics(t *testing.T) {
 
 func TestMemStorage_CollectPSUtilMetrics(t *testing.T) {
 	tests := []struct {
-		name    string
 		ms      *MemStorage
+		name    string
 		wantErr bool
 	}{
 		{

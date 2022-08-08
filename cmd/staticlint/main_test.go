@@ -51,7 +51,7 @@ func Test_addStaticCheck(t *testing.T) {
 					STadded = true
 				}
 			}
-			if !(Sadded && QFadded && STadded) {
+			if !Sadded && !QFadded && !STadded {
 				t.Error("Specific staticcheck tests cannot be picked", got)
 			}
 		})

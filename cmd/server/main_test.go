@@ -11,11 +11,11 @@ import (
 
 func Test_initStorages(t *testing.T) {
 	tests := []struct {
-		name   string
-		ctx    context.Context
-		config settings.Config
-		want   storage.IStorage
 		want1  *storage.FileStorage
+		want   storage.IStorage
+		ctx    context.Context
+		name   string
+		config settings.Config
 	}{
 		{
 			name: "normal mem init",
@@ -49,9 +49,9 @@ func Test_initStorages(t *testing.T) {
 
 func Test_setupGinRouter(t *testing.T) {
 	tests := []struct {
-		name string
 		st   storage.IStorage
 		fs   *storage.FileStorage
+		name string
 	}{
 		{
 			name: "normal gin router",
