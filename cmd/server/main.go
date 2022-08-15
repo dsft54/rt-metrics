@@ -74,7 +74,16 @@ func init() {
 	flag.StringVar(&config.DatabaseDSN, "d", "postgres://postgres:example@localhost:5432", "Postgress connection uri")
 }
 
+var (
+	buildVersion string = "N/A"
+	buildDate    string = "N/A"
+	buildCommit  string = "N/A"
+)
+
 func main() {
+	log.Println("Build version:", buildVersion)
+	log.Println("Build date:", buildDate)
+	log.Println("Build commit:", buildCommit)
 	// Init syscall channel, ctx, stores, parse flags and os vars
 	syscallCancelChan := make(chan os.Signal, 1)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -89,7 +98,7 @@ func main() {
 
 	// Handle file interaction if neccesary
 	if config.Restore {
-		err := st.UploadFromFile(fs.FilePath)
+		err = st.UploadFromFile(fs.FilePath)
 		if err != nil {
 			log.Println("Wanted to restore old metrics from file on server start but failed; ", err)
 		}
@@ -105,7 +114,7 @@ func main() {
 		Handler: router,
 	}
 	go func() {
-		err := server.ListenAndServe()
+		err = server.ListenAndServe()
 		if err != nil {
 			log.Println("Listen: ", err)
 		}
@@ -115,7 +124,7 @@ func main() {
 	signal.Notify(syscallCancelChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	sig := <-syscallCancelChan
 	log.Println("Caught syscall: ", sig)
-	if err := server.Shutdown(ctx); err != nil {
+	if err = server.Shutdown(ctx); err != nil {
 		log.Fatal("Server Shutdown:", err)
 	}
 	log.Println("Server exiting")
@@ -127,7 +136,7 @@ func main() {
 	}
 	defer fmem.Close()
 	runtime.GC()
-	if err := pprof.WriteHeapProfile(fmem); err != nil {
+	if err = pprof.WriteHeapProfile(fmem); err != nil {
 		panic(err)
 	}
 

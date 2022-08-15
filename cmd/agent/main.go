@@ -13,7 +13,7 @@ import (
 
 	"github.com/caarlos0/env"
 	"github.com/go-resty/resty/v2"
-	
+
 	"github.com/dsft54/rt-metrics/config/agent/settings"
 	"github.com/dsft54/rt-metrics/internal/agent/scheduller"
 	"github.com/dsft54/rt-metrics/internal/agent/storage"
@@ -118,9 +118,17 @@ func init() {
 	flag.StringVar(&config.HashKey, "k", "", "SHA256 signing key")
 }
 
-var config settings.Config
+var (
+	config       settings.Config
+	buildVersion string = "N/A"
+	buildDate    string = "N/A"
+	buildCommit  string = "N/A"
+)
 
 func main() {
+	log.Println("Build version:", buildVersion)
+	log.Println("Build date:", buildDate)
+	log.Println("Build commit:", buildCommit)
 	flag.Parse()
 	err := env.Parse(&config)
 	if err != nil {

@@ -212,11 +212,11 @@ func TestAddressedRequest(t *testing.T) {
 func TestRequestMetricJSON(t *testing.T) {
 	var v float64
 	tests := []struct {
-		name         string
 		st           *mockStorage
-		key          string
 		request      *storage.Metrics
 		wantResponse *storage.Metrics
+		name         string
+		key          string
 		code         int
 	}{
 		{
@@ -293,11 +293,11 @@ func TestRequestMetricJSON(t *testing.T) {
 func TestUpdateMetricJSON(t *testing.T) {
 	var v float64
 	tests := []struct {
-		name    string
 		st      *mockStorage
 		fs      *storage.FileStorage
-		key     string
 		request *storage.Metrics
+		name    string
+		key     string
 		code    int
 	}{
 		{
@@ -383,8 +383,8 @@ func TestUpdateMetricJSON(t *testing.T) {
 
 func TestPingDatabase(t *testing.T) {
 	tests := []struct {
-		name string
 		st   storage.IStorage
+		name string
 		code int
 	}{
 		{
@@ -407,8 +407,8 @@ func TestPingDatabase(t *testing.T) {
 
 func TestRequestAllMetrics(t *testing.T) {
 	tests := []struct {
-		name string
 		st   storage.IStorage
+		name string
 		code int
 	}{
 		{

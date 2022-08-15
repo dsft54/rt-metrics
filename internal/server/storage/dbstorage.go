@@ -14,9 +14,9 @@ import (
 // DBStorage - структура реализующая интерфейс IStorage, которая содержит в себе подключение к БД, конфигурацию этого подключения
 // и переданный ей контекст.
 type DBStorage struct {
+	Context    context.Context
 	Connection *pgx.Conn
 	ConnConfig pgx.ConnConfig
-	Context    context.Context
 }
 
 // InsertMetric исполняет sql запрос к бд добавляющий или обновляющий (при конфликте) значение метрики типа gauge
