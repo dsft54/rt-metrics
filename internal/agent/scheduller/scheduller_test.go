@@ -63,8 +63,8 @@ func wrapWait(wg *sync.WaitGroup) <-chan struct{} {
 
 func TestScheduller_ExitRelease(t *testing.T) {
 	tests := []struct {
-		name string
 		sch  *Scheduller
+		name string
 	}{
 		{
 			name: "release test",

@@ -167,9 +167,9 @@ func TestFileStorage_SaveStorageToFile(t *testing.T) {
 func TestFileStorage_IntervalUpdate(t *testing.T) {
 	tests := []struct {
 		f    *FileStorage
-		dur  time.Duration
-		ctx  context.Context
 		s    IStorage
+		ctx  context.Context
+		dur  time.Duration
 		name string
 	}{
 		{

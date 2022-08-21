@@ -3,18 +3,15 @@ package handlers
 import (
 	"bytes"
 	"compress/gzip"
-	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
-	"crypto/x509"
-	"encoding/pem"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	
+	"github.com/dsft54/rt-metrics/internal/cryptokey"
 )
 
 type gzipBodyWriter struct {
@@ -77,43 +74,22 @@ func Decompression() gin.HandlerFunc {
 	}
 }
 
-func Decryption(keyPath string) gin.HandlerFunc {
+func Decryption(private *rsa.PrivateKey, chunkSize int) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		keyData, err := ioutil.ReadFile(keyPath)
-		if err != nil {
-			c.AbortWithError(http.StatusInternalServerError, err)
-			return
-		}
-		block, _ := pem.Decode(keyData)
-		private, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-		if err != nil {
-			c.AbortWithError(http.StatusInternalServerError, err)
-			return
-		}
 		body, err := io.ReadAll(c.Request.Body)
 		if err != nil {
 			c.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}
 		log.Println(string(body))
-		msgLen := len(body)
-		step := 384
-		var decryptedBytes []byte
-		for start := 0; start < msgLen; start += step {
-			finish := start + step
-			if finish > msgLen {
-				finish = msgLen
-			}
-			decryptedBlock, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, private.(*rsa.PrivateKey), body[start:finish], nil)
-			if err != nil {
-				c.AbortWithError(http.StatusInternalServerError, err)
-				return
-			}
-			decryptedBytes = append(decryptedBytes, decryptedBlock...)
+		decryptedBody, err := cryptokey.DecryptMessage(body, private, chunkSize)
+		if err != nil {
+			c.AbortWithError(http.StatusInternalServerError, err)
+			return
 		}
-		log.Println(string(decryptedBytes))
-		c.Request.ContentLength = int64(len(decryptedBytes))
-		c.Request.Body = io.NopCloser(bytes.NewBuffer(decryptedBytes))
+		log.Println(string(decryptedBody))
+		c.Request.ContentLength = int64(len(decryptedBody))
+		c.Request.Body = io.NopCloser(bytes.NewBuffer(decryptedBody))
 		c.Next()
 	}
 }

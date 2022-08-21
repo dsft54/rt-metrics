@@ -14,8 +14,9 @@ import (
 
 	"github.com/caarlos0/env"
 	"github.com/gin-gonic/gin"
-	
+
 	"github.com/dsft54/rt-metrics/config/server/settings"
+	"github.com/dsft54/rt-metrics/internal/cryptokey"
 	"github.com/dsft54/rt-metrics/internal/server/handlers"
 	"github.com/dsft54/rt-metrics/internal/server/storage"
 )
@@ -53,8 +54,17 @@ func setupGinRouter(st storage.IStorage, fs *storage.FileStorage, keyPath string
 		gin.Logger(),
 	)
 	if keyPath != "" {
+		private, err := cryptokey.ParsePrivateKey(keyPath)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pub, err := cryptokey.ParsePublicKey(keyPath+".pub")
+		if err != nil {
+			log.Fatal(err)
+		}
+		chunkSize := pub.Size()
 		router.Use(
-			handlers.Decryption(keyPath),
+			handlers.Decryption(private, chunkSize),
 		)
 	}
 	router.GET("/", handlers.RequestAllMetrics(st))
@@ -78,6 +88,7 @@ func init() {
 	flag.StringVar(&config.HashKey, "k", "", "SHA256 signing key")
 	flag.StringVar(&config.DatabaseDSN, "d", "postgres://postgres:example@localhost:5432", "Postgress connection uri")
 	flag.StringVar(&config.CryptoKey, "crypto-key", "", "Path to public rsa key")
+	flag.StringVar(&config.Config, "c", "", "Path to json config file")
 }
 
 var (
@@ -99,6 +110,7 @@ func main() {
 	if err != nil {
 		log.Println(err)
 	}
+	config.ParseFromFile()
 	st, fs := initStorages(ctx, config)
 	log.Println("Running config - ", config)
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/rsa"
 	"encoding/json"
 	"flag"
 	"log"
@@ -17,6 +18,7 @@ import (
 	"github.com/dsft54/rt-metrics/config/agent/settings"
 	"github.com/dsft54/rt-metrics/internal/agent/scheduller"
 	"github.com/dsft54/rt-metrics/internal/agent/storage"
+	"github.com/dsft54/rt-metrics/internal/cryptokey"
 )
 
 // sendData собирает json в массив байт, и отправляет его при помощи resty.Client на
@@ -26,12 +28,17 @@ func sendData(url string, keyPath string, m interface{}, client *resty.Client) e
 	if err != nil {
 		log.Fatal(err)
 	}
-	// if keyPath != "" {
-	// 	rawData, err = Enc
-	// 	if err != nil {
-	// 		log.Fatal(err)
-	// 	}
-	// }
+	if keyPath != "" {
+		var pub *rsa.PublicKey
+		pub, err = cryptokey.ParsePublicKey(keyPath)
+		if err != nil {
+			log.Fatal(err)
+		}
+		rawData, err = cryptokey.EncryptMessage(rawData, pub)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 	_, err = client.R().
 		SetHeader("Content-Type", "application/json").
 		SetBody(rawData).
@@ -123,6 +130,7 @@ func init() {
 	flag.BoolVar(&config.Batched, "b", true, "Batched metric report")
 	flag.StringVar(&config.HashKey, "k", "", "SHA256 signing key")
 	flag.StringVar(&config.CryptoKey, "crypto-key", "", "Path to public rsa key")
+	flag.StringVar(&config.Config, "c", "", "Path to json config file")
 }
 
 var (
@@ -141,6 +149,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	config.ParseFromFile()
 	ms := storage.NewMemStorage()
 	wg := new(sync.WaitGroup)
 	sch := scheduller.NewScheduller(&config)

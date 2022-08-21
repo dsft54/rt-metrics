@@ -1,5 +1,5 @@
-// Package rsa implents rsa encryption/decryption of byte slice by ssh keypair
-package rsa
+// Package cryptokey implents rsa encryption/decryption of byte slice by ssh keypair
+package cryptokey
 
 import (
 	"crypto/rand"
