@@ -37,7 +37,7 @@ func Test_sendData(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := sendData(tt.args.url, &tt.args.metrics, client); (err != nil) != tt.wantErr {
+			if err := sendData(tt.args.url, "", &tt.args.metrics, client); (err != nil) != tt.wantErr {
 				t.Errorf("sendData() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

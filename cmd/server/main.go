@@ -44,7 +44,7 @@ func initStorages(ctx context.Context, config settings.Config) (storage.IStorage
 }
 
 // setupGinRouter создает *gin.Engine определяя работу маршрутизатора и используемое middleware.
-func setupGinRouter(st storage.IStorage, fs *storage.FileStorage) *gin.Engine {
+func setupGinRouter(st storage.IStorage, fs *storage.FileStorage, keyPath string) *gin.Engine {
 	router := gin.New()
 	router.Use(
 		gin.Recovery(),
@@ -52,6 +52,11 @@ func setupGinRouter(st storage.IStorage, fs *storage.FileStorage) *gin.Engine {
 		handlers.Compression(),
 		gin.Logger(),
 	)
+	if keyPath != "" {
+		router.Use(
+			handlers.Decryption(keyPath),
+		)
+	}
 	router.GET("/", handlers.RequestAllMetrics(st))
 	router.GET("/ping", handlers.PingDatabase(st))
 	router.GET("/value/:type/:name", handlers.AddressedRequest(st))
@@ -72,6 +77,7 @@ func init() {
 	flag.DurationVar(&config.StoreInterval, "i", 300*time.Second, "Update file storage interval")
 	flag.StringVar(&config.HashKey, "k", "", "SHA256 signing key")
 	flag.StringVar(&config.DatabaseDSN, "d", "postgres://postgres:example@localhost:5432", "Postgress connection uri")
+	flag.StringVar(&config.CryptoKey, "crypto-key", "", "Path to public rsa key")
 }
 
 var (
@@ -108,7 +114,7 @@ func main() {
 	}
 
 	// Start gin engine
-	router := setupGinRouter(st, fs)
+	router := setupGinRouter(st, fs, config.CryptoKey)
 	server := &http.Server{
 		Addr:    config.Address,
 		Handler: router,

@@ -21,11 +21,17 @@ import (
 
 // sendData собирает json в массив байт, и отправляет его при помощи resty.Client на
 // url в теле POST запроса.
-func sendData(url string, m interface{}, client *resty.Client) error {
+func sendData(url string, keyPath string, m interface{}, client *resty.Client) error {
 	rawData, err := json.Marshal(m)
 	if err != nil {
 		log.Fatal(err)
 	}
+	// if keyPath != "" {
+	// 	rawData, err = Enc
+	// 	if err != nil {
+	// 		log.Fatal(err)
+	// 	}
+	// }
 	_, err = client.R().
 		SetHeader("Content-Type", "application/json").
 		SetBody(rawData).
@@ -56,7 +62,7 @@ func reportMetrics(ctx context.Context, sch *scheduller.Scheduller, cfg *setting
 					case <-ctx.Done():
 						return
 					default:
-						err := sendData("http://"+cfg.Address+"/update", &value, client)
+						err := sendData("http://"+cfg.Address+"/update", cfg.CryptoKey, &value, client)
 						if err != nil {
 							log.Println(err)
 							continue
@@ -64,7 +70,7 @@ func reportMetrics(ctx context.Context, sch *scheduller.Scheduller, cfg *setting
 					}
 				}
 			} else {
-				err := sendData("http://"+cfg.Address+"/updates", &metricsSlice, client)
+				err := sendData("http://"+cfg.Address+"/updates", cfg.CryptoKey, &metricsSlice, client)
 				if err != nil {
 					log.Println(err)
 				}
@@ -116,6 +122,7 @@ func init() {
 	flag.DurationVar(&config.ReportInterval, "r", 10*time.Second, "Report metrics interval")
 	flag.BoolVar(&config.Batched, "b", true, "Batched metric report")
 	flag.StringVar(&config.HashKey, "k", "", "SHA256 signing key")
+	flag.StringVar(&config.CryptoKey, "crypto-key", "", "Path to public rsa key")
 }
 
 var (
