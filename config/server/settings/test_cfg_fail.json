@@ -1,8 +1,8 @@
 {
     "address": "localhost:8080",
     "restore": true,
-    "store_interval": "1s",
-    "store_file": "/path/to/file.db",
+    "store_file": 21,
     "database_dsn": "postgres",
+    "store_interval": "2s",
     "crypto_key": "/path/to/key.pem"
 }

@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"io/ioutil"
 
 	"golang.org/x/crypto/ssh"
@@ -40,6 +41,9 @@ func ParsePrivateKey(path string) (*rsa.PrivateKey, error) {
 }
 
 func EncryptMessage(data []byte, pub *rsa.PublicKey) ([]byte, error) {
+	if pub == nil {
+		return nil, errors.New("nil pub key")
+	}
 	hash := sha256.New()
 	msgLen := len(data)
 	step := pub.Size() - 2*hash.Size() - 2
@@ -59,6 +63,9 @@ func EncryptMessage(data []byte, pub *rsa.PublicKey) ([]byte, error) {
 }
 
 func DecryptMessage(data []byte, private *rsa.PrivateKey, step int) ([]byte, error) {
+	if private == nil {
+		return nil, errors.New("nil private key")
+	}
 	hash := sha256.New()
 	msgLen := len(data)
 	var decryptedBytes []byte

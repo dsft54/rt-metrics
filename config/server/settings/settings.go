@@ -3,6 +3,7 @@ package settings
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"time"
 )
@@ -16,21 +17,47 @@ type Config struct {
 	CryptoKey     string        `env:"CRYPTO_KEY" json:"crypto_key"`
 	Config        string        `env:"CONFIG"`
 	Restore       bool          `env:"RESTORE" json:"restore"`
-	StoreInterval time.Duration `env:"STORE_INTERVAL" json:"store_interval"`
+	StoreInterval time.Duration `env:"STORE_INTERVAL"`
 }
 
-func (c *Config) ParseFromFile() {
+func (c *Config) UnmarshalJSON(b []byte) error {
+	type ConfigAlias Config
+	aliasValue := &struct {
+		*ConfigAlias
+		StoreInt interface{} `json:"store_interval"`
+	}{
+		ConfigAlias: (*ConfigAlias)(c),
+	}
+	err := json.Unmarshal(b, &aliasValue)
+	if err != nil {
+		return err
+	}
+	switch value := aliasValue.StoreInt.(type) {
+	case float64:
+		c.StoreInterval = time.Duration(value)
+	case string:
+		c.StoreInterval, err = time.ParseDuration(value)
+		if err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("invalid duration: %#v", aliasValue.StoreInt)
+	}
+	return nil
+}
+
+func (c *Config) ParseFromFile() error {
 	if c.Config == "" {
-		return
+		return nil
 	}
 	data, err := ioutil.ReadFile(c.Config)
 	if err != nil {
-		return
+		return err
 	}
 	var fC Config
 	err = json.Unmarshal(data, &fC)
 	if err != nil {
-		return
+		return err
 	}
 	if c.Address == "" && fC.Address != "" {
 		c.Address = fC.Address
@@ -50,4 +77,5 @@ func (c *Config) ParseFromFile() {
 	if c.StoreInterval == 0 && fC.StoreInterval != 0 {
 		c.StoreInterval = fC.StoreInterval
 	}
+	return nil
 }

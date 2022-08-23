@@ -1,0 +1,9 @@
+{
+    "address": 22,
+    "hash_key": "test",
+    "crypto_key": "/path/to/key.pem",
+    "store_file": "/path/to/file.db",
+    "batched": false,
+    "poll_interval": "1s",
+    "report_interval": "1s"
+}

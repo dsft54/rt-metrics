@@ -110,7 +110,10 @@ func main() {
 	if err != nil {
 		log.Println(err)
 	}
-	config.ParseFromFile()
+	err = config.ParseFromFile()
+	if err != nil {
+		log.Println(err)
+	}
 	st, fs := initStorages(ctx, config)
 	log.Println("Running config - ", config)
 

@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -13,9 +14,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/assert"
-	
+
 	"github.com/dsft54/rt-metrics/internal/server/storage"
 )
+
+type errReader int
+
+func (errReader) Read(p []byte) (n int, err error) {
+	return 0, errors.New("test error")
+}
 
 var (
 	errNotFound  = fmt.Errorf("metric not found")
@@ -52,12 +59,25 @@ func (ms *mockStorage) InsertBatchMetric(metrics []storage.Metrics) error {
 }
 
 func (ms *mockStorage) ReadMetric(mr *storage.Metrics) (*storage.Metrics, error) {
-	var value float64
-	if (mr.MType != "gauge") && (mr.ID != "Alloc") {
-		return nil, errNotFound
+	var (
+		value float64
+		delta int64
+	)
+	switch mr.MType {
+	case "gauge":
+		if mr.ID != "Alloc" {
+			return nil, errNotFound
+		}
+		mr.Value = &value
+		return mr, nil
+	case "counter":
+		if mr.ID != "Pollcount" {
+			return nil, errNotFound
+		}
+		mr.Delta = &delta
+		return mr, nil
 	}
-	mr.Value = &value
-	return mr, nil
+	return nil, errNotFound
 }
 
 func (ms *mockStorage) ReadAllMetrics() ([]storage.Metrics, error) {
@@ -182,9 +202,15 @@ func TestAddressedRequest(t *testing.T) {
 		code int
 	}{
 		{
-			name: "Existing metric test",
+			name: "Existing metric gauge test",
 			st:   &mockStorage{},
 			url:  "/value/gauge/Alloc",
+			code: 200,
+		},
+		{
+			name: "Existing metric counter test",
+			st:   &mockStorage{},
+			url:  "/value/counter/Pollcount",
 			code: 200,
 		},
 		{
@@ -210,7 +236,10 @@ func TestAddressedRequest(t *testing.T) {
 }
 
 func TestRequestMetricJSON(t *testing.T) {
-	var v float64
+	var (
+		v float64
+		d int64
+	)
 	tests := []struct {
 		st           *mockStorage
 		request      *storage.Metrics
@@ -265,6 +294,52 @@ func TestRequestMetricJSON(t *testing.T) {
 			},
 			code: 200,
 		},
+		{
+			name: "Simple basic test counter with key",
+			st:   &mockStorage{},
+			key:  "testkey",
+			request: &storage.Metrics{
+				ID:    "Pollcount",
+				MType: "counter",
+			},
+			wantResponse: &storage.Metrics{
+				ID:    "Pollcount",
+				MType: "counter",
+				Delta: &d,
+				Hash:  "6c8781291e7d9d55b240dc460056f1661d5b4927119a5fa11c6a54eb1b3cd8e4",
+			},
+			code: 200,
+		},
+		{
+			name: "reader err",
+			st:   &mockStorage{},
+			key:  "",
+			request: &storage.Metrics{
+				ID:    "Alloc",
+				MType: "gauge",
+			},
+			wantResponse: &storage.Metrics{
+				ID:    "Alloc",
+				MType: "gauge",
+				Value: &v,
+			},
+			code: 500,
+		},
+		{
+			name: "unmarshall err",
+			st:   &mockStorage{},
+			key:  "",
+			request: &storage.Metrics{
+				ID:    "Alloc",
+				MType: "gauge",
+			},
+			wantResponse: &storage.Metrics{
+				ID:    "Alloc",
+				MType: "gauge",
+				Value: &v,
+			},
+			code: 500,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -275,16 +350,27 @@ func TestRequestMetricJSON(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			req, _ := http.NewRequest("POST", "/value/", bytes.NewBuffer(breq))
-			r.ServeHTTP(w, req)
-			assert.Equal(t, tt.code, w.Code)
-			if w.Code == 200 {
-				jresp := &storage.Metrics{}
-				err = json.Unmarshal(w.Body.Bytes(), jresp)
-				if err != nil {
-					t.Error(err)
+			switch tt.name {
+			case "reader err":
+				req, _ := http.NewRequest("POST", "/value/", errReader(0))
+				r.ServeHTTP(w, req)
+				assert.Equal(t, tt.code, w.Code)
+			case "unmarshall err":
+				req, _ := http.NewRequest("POST", "/value/", bytes.NewBuffer([]byte("message")))
+				r.ServeHTTP(w, req)
+				assert.Equal(t, tt.code, w.Code)
+			default:
+				req, _ := http.NewRequest("POST", "/value/", bytes.NewBuffer(breq))
+				r.ServeHTTP(w, req)
+				assert.Equal(t, tt.code, w.Code)
+				if w.Code == 200 {
+					jresp := &storage.Metrics{}
+					err = json.Unmarshal(w.Body.Bytes(), jresp)
+					if err != nil {
+						t.Error(err)
+					}
+					assert.Equal(t, tt.wantResponse, jresp)
 				}
-				assert.Equal(t, tt.wantResponse, jresp)
 			}
 		})
 	}
@@ -353,6 +439,21 @@ func TestUpdateMetricJSON(t *testing.T) {
 			},
 			code: 200,
 		},
+		{
+			name: "reader err",
+			st:   &mockStorage{},
+			fs: &storage.FileStorage{
+				FilePath:    "test",
+				Synchronize: true,
+			},
+			key: "",
+			request: &storage.Metrics{
+				ID:    "Alloc",
+				MType: "gauge",
+				Value: &v,
+			},
+			code: 500,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -363,19 +464,25 @@ func TestUpdateMetricJSON(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			req, _ := http.NewRequest("POST", "/update/", bytes.NewBuffer(breq))
-			r.ServeHTTP(w, req)
-			assert.Equal(t, tt.code, w.Code)
-			if tt.fs.Synchronize && tt.fs.FilePath != "" {
-				data, err := ioutil.ReadFile(tt.fs.FilePath)
-				if err != nil {
-					t.Error(err, tt)
+			if tt.name == "reader err" {
+				req, _ := http.NewRequest("POST", "/update/", errReader(0))
+				r.ServeHTTP(w, req)
+				assert.Equal(t, tt.code, w.Code)
+			} else {
+				req, _ := http.NewRequest("POST", "/update/", bytes.NewBuffer(breq))
+				r.ServeHTTP(w, req)
+				assert.Equal(t, tt.code, w.Code)
+				if tt.fs.Synchronize && tt.fs.FilePath != "" {
+					data, err := ioutil.ReadFile(tt.fs.FilePath)
+					if err != nil {
+						t.Error(err, tt)
+					}
+					err = os.Remove(tt.fs.FilePath)
+					if err != nil {
+						t.Error(err, tt)
+					}
+					assert.Equal(t, string(data), "mock_test")
 				}
-				err = os.Remove(tt.fs.FilePath)
-				if err != nil {
-					t.Error(err, tt)
-				}
-				assert.Equal(t, string(data), "mock_test")
 			}
 		})
 	}

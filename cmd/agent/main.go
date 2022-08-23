@@ -149,7 +149,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	config.ParseFromFile()
+	err = config.ParseFromFile()
+	if err != nil {
+		log.Println(err)
+	}
 	ms := storage.NewMemStorage()
 	wg := new(sync.WaitGroup)
 	sch := scheduller.NewScheduller(&config)

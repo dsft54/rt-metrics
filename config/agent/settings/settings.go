@@ -9,6 +9,7 @@ package settings
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"time"
 )
@@ -19,22 +20,60 @@ type Config struct {
 	CryptoKey      string        `env:"CRYPTO_KEY" json:"crypto_key"`
 	Config         string        `env:"CONFIG"`
 	Batched        bool          `env:"BATCHED" json:"batched"`
-	PollInterval   time.Duration `env:"POLL_INTERVAL" json:"poll_interval"`
-	ReportInterval time.Duration `env:"REPORT_INTERVAL" json:"report_interval"`
+	PollInterval   time.Duration `env:"POLL_INTERVAL"`
+	ReportInterval time.Duration `env:"REPORT_INTERVAL"`
 }
 
-func (c *Config) ParseFromFile() {
+func (c *Config) UnmarshalJSON(b []byte) error {
+	type ConfigAlias Config
+	aliasValue := &struct {
+		*ConfigAlias
+		PollInt   interface{} `json:"poll_interval"`
+		ReportInt interface{} `json:"report_interval"`
+	}{
+		ConfigAlias: (*ConfigAlias)(c),
+	}
+	err := json.Unmarshal(b, &aliasValue)
+	if err != nil {
+		return err
+	}
+	switch value := aliasValue.PollInt.(type) {
+	case float64:
+		c.PollInterval = time.Duration(value)
+	case string:
+		c.PollInterval, err = time.ParseDuration(value)
+		if err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("invalid duration: %#v", aliasValue.PollInt)
+	}
+	switch value := aliasValue.ReportInt.(type) {
+	case float64:
+		c.ReportInterval = time.Duration(value)
+	case string:
+		c.ReportInterval, err = time.ParseDuration(value)
+		if err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("invalid duration: %#v", aliasValue.ReportInt)
+	}
+	return nil
+}
+
+func (c *Config) ParseFromFile() error {
 	if c.Config == "" {
-		return
+		return nil
 	}
 	data, err := ioutil.ReadFile(c.Config)
 	if err != nil {
-		return
+		return err
 	}
 	var fC Config
 	err = json.Unmarshal(data, &fC)
 	if err != nil {
-		return
+		return err
 	}
 	if c.Address == "" && fC.Address != "" {
 		c.Address = fC.Address
@@ -51,4 +90,5 @@ func (c *Config) ParseFromFile() {
 	if c.ReportInterval == 0 && fC.ReportInterval != 0 {
 		c.ReportInterval = fC.ReportInterval
 	}
+	return nil
 }
