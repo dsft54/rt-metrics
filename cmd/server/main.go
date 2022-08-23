@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"context"
 	"flag"
 	"log"
@@ -50,7 +51,7 @@ func setupGinRouter(st storage.IStorage, fs *storage.FileStorage, keyPath string
 	router.Use(
 		gin.Recovery(),
 		handlers.Decompression(),
-		handlers.Compression(),
+		handlers.Compression(gzip.BestSpeed),
 		gin.Logger(),
 	)
 	if keyPath != "" {
@@ -58,7 +59,7 @@ func setupGinRouter(st storage.IStorage, fs *storage.FileStorage, keyPath string
 		if err != nil {
 			log.Fatal(err)
 		}
-		pub, err := cryptokey.ParsePublicKey(keyPath+".pub")
+		pub, err := cryptokey.ParsePublicKey(keyPath + ".pub")
 		if err != nil {
 			log.Fatal(err)
 		}

@@ -26,17 +26,17 @@ import (
 func sendData(url string, keyPath string, m interface{}, client *resty.Client) error {
 	rawData, err := json.Marshal(m)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	if keyPath != "" {
 		var pub *rsa.PublicKey
 		pub, err = cryptokey.ParsePublicKey(keyPath)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 		rawData, err = cryptokey.EncryptMessage(rawData, pub)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 	}
 	_, err = client.R().
