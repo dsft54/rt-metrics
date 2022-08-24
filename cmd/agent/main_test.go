@@ -17,7 +17,7 @@ func Test_sendData(t *testing.T) {
 	type args struct {
 		url     string
 		keyPath string
-		metrics storage.Metrics
+		metrics interface{}
 	}
 	tests := []struct {
 		name    string
@@ -45,6 +45,18 @@ func Test_sendData(t *testing.T) {
 					MType: "",
 				},
 				keyPath: "test.pub",
+			},
+			wantErr: true,
+		},
+		{
+			name: "keypath err",
+			args: args{
+				url: "http://localhost:808",
+				metrics: storage.Metrics{
+					ID:    "",
+					MType: "",
+				},
+				keyPath: "t",
 			},
 			wantErr: true,
 		},

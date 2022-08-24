@@ -49,6 +49,9 @@ func (d *DBStorage) InsertMetric(m *Metrics) error {
 
 // ReadAllMetrics запрос всех метрик из базы, который возвращает список структур Metric
 func (d *DBStorage) ReadAllMetrics() ([]Metrics, error) {
+	if d.Connection == nil {
+		return nil, errNoDB
+	}
 	var metricsSlice []Metrics
 	rows, err := d.Connection.Query("SELECT * FROM rt_metrics;")
 	if err != nil {
@@ -184,6 +187,9 @@ func (d *DBStorage) InsertBatchMetric(metrics []Metrics) error {
 
 // Ping проверка состояния подключения бд встроенным в pgx.Connection методом.
 func (d *DBStorage) Ping() error {
+	if d.Connection == nil {
+		return errNoDB
+	}
 	err := d.Connection.Ping(d.Context)
 	if err != nil {
 		return err

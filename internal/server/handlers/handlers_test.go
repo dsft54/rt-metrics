@@ -50,11 +50,17 @@ func (ms *mockStorage) ParamsUpdate(metricType, metricName, metricValue string) 
 	return 501, errWrongType
 }
 
-func (ms *mockStorage) InsertMetric(*storage.Metrics) error {
+func (ms *mockStorage) InsertMetric(m *storage.Metrics) error {
+	if m.ID == "ERROR" {
+		return errNotFound
+	}
 	return nil
 }
 
-func (ms *mockStorage) InsertBatchMetric(metrics []storage.Metrics) error {
+func (ms *mockStorage) InsertBatchMetric(m []storage.Metrics) error {
+	if len(m) != 0 && m[0].ID == "ERROR" {
+		return errNotFound
+	}
 	return nil
 }
 
@@ -377,7 +383,10 @@ func TestRequestMetricJSON(t *testing.T) {
 }
 
 func TestUpdateMetricJSON(t *testing.T) {
-	var v float64
+	var (
+		v float64
+		d int64
+	)
 	tests := []struct {
 		st      *mockStorage
 		fs      *storage.FileStorage
@@ -412,6 +421,43 @@ func TestUpdateMetricJSON(t *testing.T) {
 			code: 200,
 		},
 		{
+			name: "Simple basic test counter with key",
+			st:   &mockStorage{},
+			fs:   &storage.FileStorage{},
+			key:  "testkey",
+			request: &storage.Metrics{
+				ID:    "Pollcount",
+				MType: "counter",
+				Delta: &d,
+				Hash:  "6c8781291e7d9d55b240dc460056f1661d5b4927119a5fa11c6a54eb1b3cd8e4",
+			},
+			code: 200,
+		},
+		{
+			name: "Wrong type",
+			st:   &mockStorage{},
+			fs:   &storage.FileStorage{},
+			key:  "testkey",
+			request: &storage.Metrics{
+				ID:    "Pollcount",
+				MType: "counteeeer",
+				Delta: &d,
+				Hash:  "6c8781291e7d9d55b240dc460056f1661d5b4927119a5fa11c6a54eb1b3cd8e4",
+			},
+			code: 500,
+		},
+		{
+			name: "Insert err",
+			st:   &mockStorage{},
+			fs:   &storage.FileStorage{},
+			request: &storage.Metrics{
+				ID:    "ERROR",
+				MType: "counter",
+				Delta: &d,
+			},
+			code: 500,
+		},
+		{
 			name: "Wrong hash",
 			st:   &mockStorage{},
 			fs:   &storage.FileStorage{},
@@ -440,7 +486,37 @@ func TestUpdateMetricJSON(t *testing.T) {
 			code: 200,
 		},
 		{
+			name: "Sync test err",
+			st:   &mockStorage{},
+			fs: &storage.FileStorage{
+				FilePath:    "",
+				Synchronize: true,
+			},
+			key: "",
+			request: &storage.Metrics{
+				ID:    "Alloc",
+				MType: "gauge",
+				Value: &v,
+			},
+			code: 500,
+		},
+		{
 			name: "reader err",
+			st:   &mockStorage{},
+			fs: &storage.FileStorage{
+				FilePath:    "test",
+				Synchronize: true,
+			},
+			key: "",
+			request: &storage.Metrics{
+				ID:    "Alloc",
+				MType: "gauge",
+				Value: &v,
+			},
+			code: 500,
+		},
+		{
+			name: "unmarshall err",
 			st:   &mockStorage{},
 			fs: &storage.FileStorage{
 				FilePath:    "test",
@@ -464,11 +540,16 @@ func TestUpdateMetricJSON(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			if tt.name == "reader err" {
+			switch tt.name {
+			case "reader err":
 				req, _ := http.NewRequest("POST", "/update/", errReader(0))
 				r.ServeHTTP(w, req)
 				assert.Equal(t, tt.code, w.Code)
-			} else {
+			case "unmarshall err":
+				req, _ := http.NewRequest("POST", "/update/", bytes.NewBuffer([]byte{255, 1, 1, 2, 0, 0}))
+				r.ServeHTTP(w, req)
+				assert.Equal(t, tt.code, w.Code)
+			default:
 				req, _ := http.NewRequest("POST", "/update/", bytes.NewBuffer(breq))
 				r.ServeHTTP(w, req)
 				assert.Equal(t, tt.code, w.Code)
@@ -499,6 +580,11 @@ func TestPingDatabase(t *testing.T) {
 			st:   &mockStorage{},
 			code: 200,
 		},
+		{
+			name: "Err ping",
+			st:   &storage.DBStorage{},
+			code: 500,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -519,9 +605,14 @@ func TestRequestAllMetrics(t *testing.T) {
 		code int
 	}{
 		{
-			name: "Normal working ping",
+			name: "Normal working",
 			st:   &mockStorage{},
 			code: 200,
+		},
+		{
+			name: "normal err",
+			st:   &storage.DBStorage{},
+			code: 500,
 		},
 	}
 	for _, tt := range tests {
@@ -532,7 +623,9 @@ func TestRequestAllMetrics(t *testing.T) {
 			req, _ := http.NewRequest("GET", "/", nil)
 			r.ServeHTTP(w, req)
 			assert.Equal(t, tt.code, w.Code)
-			assert.NotEqual(t, w.Body.Bytes(), nil)
+			if tt.name != "normal err" {
+				assert.NotEqual(t, w.Body.Bytes(), nil)
+			}
 		})
 	}
 }
@@ -599,6 +692,65 @@ func TestBatchUpdateJSON(t *testing.T) {
 			},
 			code: 200,
 		},
+		{
+			name: "Sync test",
+			st:   &mockStorage{},
+			fs: &storage.FileStorage{
+				FilePath:    "",
+				Synchronize: true,
+			},
+			key: "",
+			request: []storage.Metrics{
+				{ID: "Alloc",
+					MType: "gauge",
+					Value: &v},
+				{ID: "Heap",
+					MType: "counter",
+					Delta: &d},
+			},
+			code: 500,
+		},
+		{
+			name: "Insert err",
+			st:   &mockStorage{},
+			fs:   &storage.FileStorage{},
+			request: []storage.Metrics{
+				{ID:    "ERROR",
+				MType: "counter",
+				Delta: &d,},
+			},
+			code: 500,
+		},
+		{
+			name: "reader err",
+			st:   &mockStorage{},
+			fs: &storage.FileStorage{
+				FilePath:    "test",
+				Synchronize: true,
+			},
+			key: "",
+			request: []storage.Metrics{
+				{ID: "Alloc",
+					MType: "gauge",
+					Value: &v},
+			},
+			code: 500,
+		},
+		{
+			name: "unmarshall err",
+			st:   &mockStorage{},
+			fs: &storage.FileStorage{
+				FilePath:    "test",
+				Synchronize: true,
+			},
+			key: "",
+			request: []storage.Metrics{
+				{ID: "Alloc",
+					MType: "gauge",
+					Value: &v},
+			},
+			code: 500,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -609,19 +761,30 @@ func TestBatchUpdateJSON(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			req, _ := http.NewRequest("POST", "/updates/", bytes.NewBuffer(breq))
-			r.ServeHTTP(w, req)
-			assert.Equal(t, tt.code, w.Code)
-			if tt.fs.Synchronize && tt.fs.FilePath != "" {
-				data, err := ioutil.ReadFile(tt.fs.FilePath)
-				if err != nil {
-					t.Error(err, tt)
+			switch tt.name {
+			case "reader err":
+				req, _ := http.NewRequest("POST", "/updates/", errReader(0))
+				r.ServeHTTP(w, req)
+				assert.Equal(t, tt.code, w.Code)
+			case "unmarshall err":
+				req, _ := http.NewRequest("POST", "/updates/", bytes.NewBuffer([]byte{255, 1, 1, 2, 0, 0}))
+				r.ServeHTTP(w, req)
+				assert.Equal(t, tt.code, w.Code)
+			default:
+				req, _ := http.NewRequest("POST", "/updates/", bytes.NewBuffer(breq))
+				r.ServeHTTP(w, req)
+				assert.Equal(t, tt.code, w.Code)
+				if tt.fs.Synchronize && tt.fs.FilePath != "" {
+					data, err := ioutil.ReadFile(tt.fs.FilePath)
+					if err != nil {
+						t.Error(err, tt)
+					}
+					err = os.Remove(tt.fs.FilePath)
+					if err != nil {
+						t.Error(err, tt)
+					}
+					assert.Equal(t, string(data), "mock_test")
 				}
-				err = os.Remove(tt.fs.FilePath)
-				if err != nil {
-					t.Error(err, tt)
-				}
-				assert.Equal(t, string(data), "mock_test")
 			}
 		})
 	}

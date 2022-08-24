@@ -99,7 +99,10 @@ func TestMemoryStorage_InsertBatchMetric(t *testing.T) {
 }
 
 func TestMemoryStorage_ReadMetric(t *testing.T) {
-	v := 3.14
+	var (
+		d int64
+		v float64
+	)
 	tests := []struct {
 		m       *MemoryStorage
 		rm      *Metrics
@@ -123,6 +126,26 @@ func TestMemoryStorage_ReadMetric(t *testing.T) {
 				MType: "gauge",
 				ID:    "Alloc",
 				Value: &v,
+			},
+			wantErr: false,
+		},{
+			name: "Basic read test",
+			m: &MemoryStorage{
+				GaugeMetrics: map[string]float64{
+					"Alloc": v,
+				},
+				CounterMetrics: map[string]int64{
+					"Pollcount": d,
+				},
+			},
+			rm: &Metrics{
+				MType: "counter",
+				ID:    "Pollcount",
+			},
+			want: &Metrics{
+				MType: "counter",
+				ID:    "Pollcount",
+				Delta: &d,
 			},
 			wantErr: false,
 		},
