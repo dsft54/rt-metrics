@@ -43,11 +43,14 @@ func TestScheduller_Start(t *testing.T) {
 		ReportInterval: 1,
 	})
 	go tsch.Start(ctx, wg)
-	cancel()
+	go func (){
+		<-time.NewTimer(1000 * time.Millisecond).C
+		cancel()
+	}()
 	select {
 	case <-wrapWait(wg):
 		// Ok
-	case <-time.NewTimer(500 * time.Millisecond).C:
+	case <-time.NewTimer(1100 * time.Millisecond).C:
 		t.Fail()
 	}
 }
