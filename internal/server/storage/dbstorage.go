@@ -22,24 +22,27 @@ type DBStorage struct {
 // InsertMetric исполняет sql запрос к бд добавляющий или обновляющий (при конфликте) значение метрики типа gauge
 // или counter. Данные метрики получаются из аргумента - структуры Metrics.
 func (d *DBStorage) InsertMetric(m *Metrics) error {
+	if d.Connection == nil {
+		return errNoDB
+	}
 	switch m.MType {
 	case "gauge":
-		_, err := d.Connection.Exec(
+		_, err := d.Connection.ExecEx(d.Context,
 			`INSERT INTO rt_metrics (id, mtype, value, hash)
 				VALUES ($1, $2, $3, $4)
 				ON CONFLICT (id) DO UPDATE
 				SET value = excluded.value, hash = excluded.hash;`,
-			m.ID, m.MType, m.Value, m.Hash)
+			nil, m.ID, m.MType, m.Value, m.Hash)
 		if err != nil {
 			return err
 		}
 	case "counter":
-		_, err := d.Connection.Exec(
+		_, err := d.Connection.ExecEx(d.Context,
 			`INSERT INTO rt_metrics (id, mtype, delta, hash)
 				VALUES ($1, $2, $3, $4)
 				ON CONFLICT (id) DO UPDATE
 				SET delta = excluded.delta + rt_metrics.delta, hash = excluded.hash;`,
-			m.ID, m.MType, m.Delta, m.Hash)
+			nil, m.ID, m.MType, m.Delta, m.Hash)
 		if err != nil {
 			return err
 		}
@@ -75,18 +78,21 @@ func (d *DBStorage) ReadAllMetrics() ([]Metrics, error) {
 // ParamsUpdate работает как и InsertMetric, за тем исключением, что параметры для обновления
 // будут получены из аргументов функции (строк)
 func (d *DBStorage) ParamsUpdate(metricType, metricID, metricValue string) (int, error) {
+	if d.Connection == nil {
+		return 500, errNoDB
+	}
 	switch metricType {
 	case "gauge":
 		value, err := strconv.ParseFloat(metricValue, 64)
 		if err != nil {
 			return 400, err
 		}
-		_, err = d.Connection.Exec(
+		_, err = d.Connection.ExecEx(d.Context,
 			`INSERT INTO rt_metrics (id, mtype, value)
 				VALUES ($1, $2, $3)
 				ON CONFLICT (id) DO UPDATE
 				SET value = excluded.value;`,
-			metricID, metricType, value)
+			nil, metricID, metricType, value)
 		if err != nil {
 			return 400, err
 		}
@@ -96,12 +102,12 @@ func (d *DBStorage) ParamsUpdate(metricType, metricID, metricValue string) (int,
 		if err != nil {
 			return 400, err
 		}
-		_, err = d.Connection.Exec(
+		_, err = d.Connection.ExecEx(d.Context,
 			`INSERT INTO rt_metrics (id, mtype, delta)
 				VALUES ($1, $2, $3)
 				ON CONFLICT (id) DO UPDATE
 				SET delta = excluded.delta + rt_metrics.delta;`,
-			metricID, metricType, delta)
+			nil, metricID, metricType, delta)
 		if err != nil {
 			return 400, err
 		}
@@ -159,7 +165,7 @@ func (d *DBStorage) UploadFromFile(path string) error {
 	}
 	return nil
 }
- 
+
 // ReadMetric sql запрос в базу для получения значения метрики, тип и название которой получены из структуры Metrics.
 func (d *DBStorage) ReadMetric(rm *Metrics) (*Metrics, error) {
 	// Read specific metric from db
@@ -197,7 +203,7 @@ func (d *DBStorage) Ping() error {
 	return nil
 }
 
-// DBConnectStorage парсит строку для подключения к базе и пытается к ней подключиться. 
+// DBConnectStorage парсит строку для подключения к базе и пытается к ней подключиться.
 // В случае успеха, создает таблицу rt_metrics, если она не существует и принимает переданный
 // в качестве аргумента функции контекст.
 func (d *DBStorage) DBConnectStorage(ctx context.Context, auth string) error {

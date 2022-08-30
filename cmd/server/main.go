@@ -29,7 +29,7 @@ var config settings.Config
 func initStorages(ctx context.Context, config settings.Config) (storage.IStorage, *storage.FileStorage) {
 	// Init file and db storages
 	filestore := storage.NewFileStorage(config)
-	dbstore := new(storage.DBStorage)
+	dbstore := &storage.DBStorage{}
 	err := dbstore.DBConnectStorage(ctx, config.DatabaseDSN)
 	if err != nil {
 		log.Println("DB error : ", err)
