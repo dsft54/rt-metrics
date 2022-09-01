@@ -16,7 +16,8 @@ func Test_sendData(t *testing.T) {
 	client := resty.New()
 	type args struct {
 		url     string
-		metrics storage.Metrics
+		keyPath string
+		metrics interface{}
 	}
 	tests := []struct {
 		name    string
@@ -31,13 +32,38 @@ func Test_sendData(t *testing.T) {
 					ID:    "",
 					MType: "",
 				},
+				keyPath: "",
+			},
+			wantErr: true,
+		},
+		{
+			name: "keypath",
+			args: args{
+				url: "http://localhost:808",
+				metrics: storage.Metrics{
+					ID:    "",
+					MType: "",
+				},
+				keyPath: "test.pub",
+			},
+			wantErr: true,
+		},
+		{
+			name: "keypath err",
+			args: args{
+				url: "http://localhost:808",
+				metrics: storage.Metrics{
+					ID:    "",
+					MType: "",
+				},
+				keyPath: "t",
 			},
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := sendData(tt.args.url, &tt.args.metrics, client); (err != nil) != tt.wantErr {
+			if err := sendData(tt.args.url, tt.args.keyPath, &tt.args.metrics, client); (err != nil) != tt.wantErr {
 				t.Errorf("sendData() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -189,10 +215,10 @@ func Test_pollRuntimeMetrics(t *testing.T) {
 
 func Test_pollPSUtilMetrics(t *testing.T) {
 	tests := []struct {
-		ctx context.Context
-		c   *sync.Cond
-		s   *storage.MemStorage
-		wg  *sync.WaitGroup
+		ctx  context.Context
+		c    *sync.Cond
+		s    *storage.MemStorage
+		wg   *sync.WaitGroup
 		name string
 	}{
 		{

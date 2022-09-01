@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"context"
 	"flag"
 	"log"
@@ -14,8 +15,9 @@ import (
 
 	"github.com/caarlos0/env"
 	"github.com/gin-gonic/gin"
-	
+
 	"github.com/dsft54/rt-metrics/config/server/settings"
+	"github.com/dsft54/rt-metrics/internal/cryptokey"
 	"github.com/dsft54/rt-metrics/internal/server/handlers"
 	"github.com/dsft54/rt-metrics/internal/server/storage"
 )
@@ -27,7 +29,7 @@ var config settings.Config
 func initStorages(ctx context.Context, config settings.Config) (storage.IStorage, *storage.FileStorage) {
 	// Init file and db storages
 	filestore := storage.NewFileStorage(config)
-	dbstore := new(storage.DBStorage)
+	dbstore := &storage.DBStorage{}
 	err := dbstore.DBConnectStorage(ctx, config.DatabaseDSN)
 	if err != nil {
 		log.Println("DB error : ", err)
@@ -44,14 +46,28 @@ func initStorages(ctx context.Context, config settings.Config) (storage.IStorage
 }
 
 // setupGinRouter создает *gin.Engine определяя работу маршрутизатора и используемое middleware.
-func setupGinRouter(st storage.IStorage, fs *storage.FileStorage) *gin.Engine {
+func setupGinRouter(st storage.IStorage, fs *storage.FileStorage, keyPath string) *gin.Engine {
 	router := gin.New()
 	router.Use(
 		gin.Recovery(),
 		handlers.Decompression(),
-		handlers.Compression(),
+		handlers.Compression(gzip.BestSpeed),
 		gin.Logger(),
 	)
+	if keyPath != "" {
+		private, err := cryptokey.ParsePrivateKey(keyPath)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pub, err := cryptokey.ParsePublicKey(keyPath + ".pub")
+		if err != nil {
+			log.Fatal(err)
+		}
+		chunkSize := pub.Size()
+		router.Use(
+			handlers.Decryption(private, chunkSize),
+		)
+	}
 	router.GET("/", handlers.RequestAllMetrics(st))
 	router.GET("/ping", handlers.PingDatabase(st))
 	router.GET("/value/:type/:name", handlers.AddressedRequest(st))
@@ -72,6 +88,8 @@ func init() {
 	flag.DurationVar(&config.StoreInterval, "i", 300*time.Second, "Update file storage interval")
 	flag.StringVar(&config.HashKey, "k", "", "SHA256 signing key")
 	flag.StringVar(&config.DatabaseDSN, "d", "postgres://postgres:example@localhost:5432", "Postgress connection uri")
+	flag.StringVar(&config.CryptoKey, "crypto-key", "", "Path to public rsa key")
+	flag.StringVar(&config.Config, "c", "", "Path to json config file")
 }
 
 var (
@@ -93,6 +111,10 @@ func main() {
 	if err != nil {
 		log.Println(err)
 	}
+	err = config.ParseFromFile()
+	if err != nil {
+		log.Println(err)
+	}
 	st, fs := initStorages(ctx, config)
 	log.Println("Running config - ", config)
 
@@ -108,7 +130,7 @@ func main() {
 	}
 
 	// Start gin engine
-	router := setupGinRouter(st, fs)
+	router := setupGinRouter(st, fs, config.CryptoKey)
 	server := &http.Server{
 		Addr:    config.Address,
 		Handler: router,

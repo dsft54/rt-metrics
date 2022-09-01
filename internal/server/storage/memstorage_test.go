@@ -87,19 +87,46 @@ func TestMemoryStorage_InsertBatchMetric(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "insert err",
+			m: &MemoryStorage{
+				GaugeMetrics:   make(map[string]float64),
+				CounterMetrics: make(map[string]int64),
+			},
+			metrics: []Metrics{
+				{
+					MType: "gaug",
+					ID:    "Alloc",
+					Value: &v,
+				},
+				{
+					MType: "coun",
+					ID:    "Counter",
+					Delta: &d,
+				},
+			},
+			wantMemSt: &MemoryStorage{},
+			wantErr:   true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.m.InsertBatchMetric(tt.metrics); (err != nil) != tt.wantErr {
+			err := tt.m.InsertBatchMetric(tt.metrics)
+			if (err != nil) != tt.wantErr {
 				t.Errorf("MemoryStorage.InsertMetric() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			assert.Equal(t, tt.m, tt.wantMemSt)
+			if err == nil {
+				assert.Equal(t, tt.m, tt.wantMemSt)
+			}
 		})
 	}
 }
 
 func TestMemoryStorage_ReadMetric(t *testing.T) {
-	v := 3.14
+	var (
+		d int64
+		v float64
+	)
 	tests := []struct {
 		m       *MemoryStorage
 		rm      *Metrics
@@ -125,6 +152,59 @@ func TestMemoryStorage_ReadMetric(t *testing.T) {
 				Value: &v,
 			},
 			wantErr: false,
+		}, 
+		{
+			name: "Basic read test",
+			m: &MemoryStorage{
+				GaugeMetrics: map[string]float64{
+					"Alloc": v,
+				},
+				CounterMetrics: map[string]int64{
+					"Pollcount": d,
+				},
+			},
+			rm: &Metrics{
+				MType: "counter",
+				ID:    "Pollcount",
+			},
+			want: &Metrics{
+				MType: "counter",
+				ID:    "Pollcount",
+				Delta: &d,
+			},
+			wantErr: false,
+		},
+		{
+			name: "read err counter",
+			m: &MemoryStorage{
+				GaugeMetrics: map[string]float64{
+					"Alloc": v,
+				},
+				CounterMetrics: map[string]int64{
+					"Pollcount": d,
+				},
+			},
+			rm: &Metrics{
+				MType: "counter",
+				ID:    "Alloc",
+			},
+			wantErr: true,
+		},
+		{
+			name: "read err gauge",
+			m: &MemoryStorage{
+				GaugeMetrics: map[string]float64{
+					"Alloc": v,
+				},
+				CounterMetrics: map[string]int64{
+					"Pollcount": d,
+				},
+			},
+			rm: &Metrics{
+				MType: "gauge",
+				ID:    "Pollcount",
+			},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -201,7 +281,7 @@ func TestMemoryStorage_ParamsUpdate(t *testing.T) {
 		wantErr     bool
 	}{
 		{
-			name: "Basic insert test",
+			name: "Basic insert g test",
 			m: &MemoryStorage{
 				GaugeMetrics:   map[string]float64{},
 				CounterMetrics: map[string]int64{},
@@ -215,6 +295,24 @@ func TestMemoryStorage_ParamsUpdate(t *testing.T) {
 					"Alloc": 3.14,
 				},
 				CounterMetrics: map[string]int64{},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Basic insert c test",
+			m: &MemoryStorage{
+				GaugeMetrics:   map[string]float64{},
+				CounterMetrics: map[string]int64{},
+			},
+			metricType:  "counter",
+			metricName:  "Pollcount",
+			metricValue: "3",
+			want:        200,
+			wantMemSt: &MemoryStorage{
+				GaugeMetrics: map[string]float64{},
+				CounterMetrics: map[string]int64{
+					"Pollcount": 3,
+				},
 			},
 			wantErr: false,
 		},
@@ -250,6 +348,22 @@ func TestMemoryStorage_ParamsUpdate(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "Conv error test",
+			m: &MemoryStorage{
+				GaugeMetrics:   map[string]float64{},
+				CounterMetrics: map[string]int64{},
+			},
+			metricType:  "counter",
+			metricName:  "Alloc",
+			metricValue: "3.14",
+			want:        400,
+			wantMemSt: &MemoryStorage{
+				GaugeMetrics:   map[string]float64{},
+				CounterMetrics: map[string]int64{},
+			},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -271,7 +385,15 @@ func TestMemoryStorage_UploadFromFile(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	tfe, err := os.OpenFile("teste", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
+	if err != nil {
+		t.Error(err)
+	}
 	_, err = tf.Write([]byte("[{\"id\":\"Alloc\",\"type\":\"gauge\",\"value\":3.14},{\"id\":\"Counter\",\"type\":\"counter\",\"delta\":3}]"))
+	if err != nil {
+		t.Error(err)
+	}
+	_, err = tfe.Write([]byte{255, 0, 0, 0, 1, 223, 12, 5})
 	if err != nil {
 		t.Error(err)
 	}
@@ -299,20 +421,49 @@ func TestMemoryStorage_UploadFromFile(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "empty filename",
+			m: &MemoryStorage{
+				GaugeMetrics:   map[string]float64{},
+				CounterMetrics: map[string]int64{},
+			},
+			path: "",
+			wantErr: true,
+		},
+		{
+			name: "unmarshall err",
+			m: &MemoryStorage{
+				GaugeMetrics:   map[string]float64{},
+				CounterMetrics: map[string]int64{},
+			},
+			path: "teste",
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err = tt.m.UploadFromFile(tt.path); (err != nil) != tt.wantErr {
+			err = tt.m.UploadFromFile(tt.path)
+			if (err != nil) != tt.wantErr {
 				t.Errorf("MemoryStorage.UploadFromFile() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			assert.Equal(t, tt.m, tt.wantMemSt)
+			if err == nil {
+				assert.Equal(t, tt.m, tt.wantMemSt)
+			}
 		})
 	}
 	err = tf.Close()
 	if err != nil {
 		t.Error(err)
 	}
+	err = tfe.Close()
+	if err != nil {
+		t.Error(err)
+	}
 	err = os.Remove(tf.Name())
+	if err != nil {
+		t.Error(err)
+	}
+	err = os.Remove(tfe.Name())
 	if err != nil {
 		t.Error(err)
 	}
@@ -369,7 +520,7 @@ func TestMemoryStorage_Ping(t *testing.T) {
 		{
 			name: "Basic ping test",
 			m: &MemoryStorage{
-				GaugeMetrics: map[string]float64{},
+				GaugeMetrics:   map[string]float64{},
 				CounterMetrics: map[string]int64{},
 			},
 			wantErr: true,

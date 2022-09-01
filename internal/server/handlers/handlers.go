@@ -62,7 +62,6 @@ func AddressedRequest(st storage.IStorage) gin.HandlerFunc {
 			c.String(http.StatusOK, "%v", *metricsResponse.Value)
 			return
 		}
-		c.Status(http.StatusNotFound)
 	}
 }
 

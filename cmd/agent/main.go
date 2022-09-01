@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/rsa"
 	"encoding/json"
 	"flag"
 	"log"
@@ -17,14 +18,26 @@ import (
 	"github.com/dsft54/rt-metrics/config/agent/settings"
 	"github.com/dsft54/rt-metrics/internal/agent/scheduller"
 	"github.com/dsft54/rt-metrics/internal/agent/storage"
+	"github.com/dsft54/rt-metrics/internal/cryptokey"
 )
 
 // sendData собирает json в массив байт, и отправляет его при помощи resty.Client на
 // url в теле POST запроса.
-func sendData(url string, m interface{}, client *resty.Client) error {
+func sendData(url string, keyPath string, m interface{}, client *resty.Client) error {
 	rawData, err := json.Marshal(m)
 	if err != nil {
-		log.Fatal(err)
+		return err
+	}
+	if keyPath != "" {
+		var pub *rsa.PublicKey
+		pub, err = cryptokey.ParsePublicKey(keyPath)
+		if err != nil {
+			return err
+		}
+		rawData, err = cryptokey.EncryptMessage(rawData, pub)
+		if err != nil {
+			return err
+		}
 	}
 	_, err = client.R().
 		SetHeader("Content-Type", "application/json").
@@ -56,7 +69,7 @@ func reportMetrics(ctx context.Context, sch *scheduller.Scheduller, cfg *setting
 					case <-ctx.Done():
 						return
 					default:
-						err := sendData("http://"+cfg.Address+"/update", &value, client)
+						err := sendData("http://"+cfg.Address+"/update", cfg.CryptoKey, &value, client)
 						if err != nil {
 							log.Println(err)
 							continue
@@ -64,7 +77,7 @@ func reportMetrics(ctx context.Context, sch *scheduller.Scheduller, cfg *setting
 					}
 				}
 			} else {
-				err := sendData("http://"+cfg.Address+"/updates", &metricsSlice, client)
+				err := sendData("http://"+cfg.Address+"/updates", cfg.CryptoKey, &metricsSlice, client)
 				if err != nil {
 					log.Println(err)
 				}
@@ -116,6 +129,8 @@ func init() {
 	flag.DurationVar(&config.ReportInterval, "r", 10*time.Second, "Report metrics interval")
 	flag.BoolVar(&config.Batched, "b", true, "Batched metric report")
 	flag.StringVar(&config.HashKey, "k", "", "SHA256 signing key")
+	flag.StringVar(&config.CryptoKey, "crypto-key", "", "Path to public rsa key")
+	flag.StringVar(&config.Config, "c", "", "Path to json config file")
 }
 
 var (
@@ -133,6 +148,10 @@ func main() {
 	err := env.Parse(&config)
 	if err != nil {
 		panic(err)
+	}
+	err = config.ParseFromFile()
+	if err != nil {
+		log.Println(err)
 	}
 	ms := storage.NewMemStorage()
 	wg := new(sync.WaitGroup)

@@ -11,6 +11,7 @@ import (
 )
 
 var (
+	errWrType = fmt.Errorf("insert data: wrong type")
 	errNoDB     = fmt.Errorf("no db connected")
 	errNotFound = fmt.Errorf("not found in memory storage")
 )
@@ -33,6 +34,8 @@ func (m *MemoryStorage) InsertMetric(met *Metrics) error {
 		m.GaugeMetrics[met.ID] = *met.Value
 	case "counter":
 		m.CounterMetrics[met.ID] += *met.Delta
+	default:
+		return errWrType
 	}
 	return nil
 }
