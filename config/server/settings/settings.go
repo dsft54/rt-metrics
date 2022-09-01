@@ -16,6 +16,7 @@ type Config struct {
 	DatabaseDSN   string        `env:"DATABASE_DSN" json:"database_dsn"`
 	CryptoKey     string        `env:"CRYPTO_KEY" json:"crypto_key"`
 	Config        string        `env:"CONFIG"`
+	TrustedSubnet string        `env:"TRUSTED_SUBNET" json:"trusted_subnet"`
 	Restore       bool          `env:"RESTORE" json:"restore"`
 	StoreInterval time.Duration `env:"STORE_INTERVAL"`
 }

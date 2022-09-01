@@ -61,7 +61,7 @@ func Test_setupGinRouter(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := setupGinRouter(tt.st, tt.fs, "")
+			got := setupGinRouter(tt.st, tt.fs, "", "")
 			if len(got.Handlers) != 4 {
 				t.Error("Failed to build middleware chain, should be: ", len(got.Handlers))
 			}

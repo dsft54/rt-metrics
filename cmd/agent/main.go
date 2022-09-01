@@ -41,6 +41,7 @@ func sendData(url string, keyPath string, m interface{}, client *resty.Client) e
 	}
 	_, err = client.R().
 		SetHeader("Content-Type", "application/json").
+		SetHeader("X-Real-IP", "127.0.0.1").
 		SetBody(rawData).
 		Post(url)
 	return err

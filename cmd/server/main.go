@@ -46,7 +46,7 @@ func initStorages(ctx context.Context, config settings.Config) (storage.IStorage
 }
 
 // setupGinRouter создает *gin.Engine определяя работу маршрутизатора и используемое middleware.
-func setupGinRouter(st storage.IStorage, fs *storage.FileStorage, keyPath string) *gin.Engine {
+func setupGinRouter(st storage.IStorage, fs *storage.FileStorage, keyPath, allowedNetwork string) *gin.Engine {
 	router := gin.New()
 	router.Use(
 		gin.Recovery(),
@@ -54,6 +54,9 @@ func setupGinRouter(st storage.IStorage, fs *storage.FileStorage, keyPath string
 		handlers.Compression(gzip.BestSpeed),
 		gin.Logger(),
 	)
+	if allowedNetwork != "" {
+		router.Use(handlers.NetFilter(allowedNetwork))
+	}
 	if keyPath != "" {
 		private, err := cryptokey.ParsePrivateKey(keyPath)
 		if err != nil {
@@ -82,14 +85,15 @@ func setupGinRouter(st storage.IStorage, fs *storage.FileStorage, keyPath string
 
 // init определяет используемые флаги командной строки для настройки запуска сервера.
 func init() {
-	flag.StringVar(&config.Address, "a", "localhost:8080", "Server address")
-	flag.BoolVar(&config.Restore, "r", true, "Restore metrics from file on start")
-	flag.StringVar(&config.StoreFile, "f", "/tmp/devops-metrics-db.json", "Path to file storage")
-	flag.DurationVar(&config.StoreInterval, "i", 300*time.Second, "Update file storage interval")
-	flag.StringVar(&config.HashKey, "k", "", "SHA256 signing key")
 	flag.StringVar(&config.DatabaseDSN, "d", "postgres://postgres:example@localhost:5432", "Postgress connection uri")
+	flag.StringVar(&config.StoreFile, "f", "/tmp/devops-metrics-db.json", "Path to file storage")
 	flag.StringVar(&config.CryptoKey, "crypto-key", "", "Path to public rsa key")
+	flag.StringVar(&config.TrustedSubnet, "t", "", "Trusted source of logs")
+	flag.StringVar(&config.Address, "a", "localhost:8080", "Server address")
 	flag.StringVar(&config.Config, "c", "", "Path to json config file")
+	flag.StringVar(&config.HashKey, "k", "", "SHA256 signing key")
+	flag.BoolVar(&config.Restore, "r", true, "Restore metrics from file on start")
+	flag.DurationVar(&config.StoreInterval, "i", 300*time.Second, "Update file storage interval")
 }
 
 var (
@@ -130,7 +134,7 @@ func main() {
 	}
 
 	// Start gin engine
-	router := setupGinRouter(st, fs, config.CryptoKey)
+	router := setupGinRouter(st, fs, config.CryptoKey, config.TrustedSubnet)
 	server := &http.Server{
 		Addr:    config.Address,
 		Handler: router,
