@@ -87,7 +87,6 @@ func Decryption(private *rsa.PrivateKey, chunkSize int) gin.HandlerFunc {
 			c.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}
-		log.Println(string(decryptedBody))
 		c.Request.ContentLength = int64(len(decryptedBody))
 		c.Request.Body = io.NopCloser(bytes.NewBuffer(decryptedBody))
 		c.Next()

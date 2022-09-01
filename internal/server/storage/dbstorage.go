@@ -56,7 +56,7 @@ func (d *DBStorage) ReadAllMetrics() ([]Metrics, error) {
 		return nil, errNoDB
 	}
 	var metricsSlice []Metrics
-	rows, err := d.Connection.Query("SELECT * FROM rt_metrics;")
+	rows, err := d.Connection.QueryEx(d.Context, "SELECT * FROM rt_metrics;", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -152,12 +152,12 @@ func (d *DBStorage) UploadFromFile(path string) error {
 				return err
 			}
 		case "counter":
-			_, err := d.Connection.Exec(
+			_, err := d.Connection.ExecEx(d.Context,
 				`INSERT INTO rt_metrics (id, mtype, delta, hash)
 						VALUES ($1, $2, $3, $4)
 						ON CONFLICT (id) DO UPDATE
 						SET delta = excluded.delta, hash = excluded.hash;`,
-				metric.ID, metric.MType, metric.Delta, metric.Hash)
+				nil, metric.ID, metric.MType, metric.Delta, metric.Hash)
 			if err != nil {
 				return err
 			}
@@ -169,10 +169,10 @@ func (d *DBStorage) UploadFromFile(path string) error {
 // ReadMetric sql запрос в базу для получения значения метрики, тип и название которой получены из структуры Metrics.
 func (d *DBStorage) ReadMetric(rm *Metrics) (*Metrics, error) {
 	// Read specific metric from db
-	row := d.Connection.QueryRow(
+	row := d.Connection.QueryRowEx(d.Context,
 		`SELECT delta, value, hash FROM rt_metrics 
 			WHERE rt_metrics.id = $1 AND rt_metrics.mtype = $2`,
-		rm.ID, rm.MType)
+		nil, rm.ID, rm.MType)
 	err := row.Scan(&rm.Delta, &rm.Value, &rm.Hash)
 	if err != nil {
 		return nil, err
@@ -239,7 +239,7 @@ func (d *DBStorage) DBConnectStorage(ctx context.Context, auth string) error {
 // DBFlushTable очищает таблицу rt_metrics.
 func (d *DBStorage) DBFlushTable() error {
 	// Empty table
-	_, err := d.Connection.Exec("TRUNCATE rt_metrics;")
+	_, err := d.Connection.ExecEx(d.Context, "TRUNCATE rt_metrics;", nil)
 	if err != nil {
 		return err
 	}
