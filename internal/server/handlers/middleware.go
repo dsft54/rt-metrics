@@ -98,7 +98,8 @@ func NetFilter(allowedNetwork string) gin.HandlerFunc {
     return func(c *gin.Context) {
 		_, sub, err := net.ParseCIDR(allowedNetwork)
 		if err != nil {
-			log.Fatal(err)
+			c.AbortWithStatus(http.StatusForbidden)
+            return
 		}
 		if !sub.Contains(net.ParseIP(c.Request.Header.Get("X-Real-IP"))) {
             c.AbortWithStatus(http.StatusForbidden)

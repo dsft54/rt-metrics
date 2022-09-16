@@ -147,3 +147,45 @@ func TestDecryption(t *testing.T) {
 		})
 	}
 }
+
+func TestNetFilter(t *testing.T) {
+	req, _ := http.NewRequest("POST", "/", bytes.NewBuffer([]byte{}))
+	req.Header.Set("X-Real-IP", "192.168.1.1")
+	tests := []struct {
+		name           string
+		allowedNetwork string
+		req            *http.Request
+		want           int
+	}{
+		{
+			name:           "net parse err",
+			allowedNetwork: "abcdef",
+			req:            req,
+			want:           403,
+		},
+		{
+			name:           "not allowed",
+			allowedNetwork: "127.0.0.0/8",
+			req:            req,
+			want:           403,
+		},
+		{
+			name:           "allowed",
+			allowedNetwork: "192.168.1.0/24",
+			req:            req,
+			want:           200,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			_, r := gin.CreateTestContext(w)
+			r.Use(NetFilter(tt.allowedNetwork))
+			r.POST("/", func(c *gin.Context) {
+				c.Status(200)
+			})
+			r.ServeHTTP(w, tt.req)
+			assert.Equal(t, tt.want, w.Code)
+		})
+	}
+}
