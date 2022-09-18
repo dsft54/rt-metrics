@@ -14,11 +14,15 @@ import (
 
 	"github.com/caarlos0/env"
 	"github.com/go-resty/resty/v2"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/dsft54/rt-metrics/config/agent/settings"
+	"github.com/dsft54/rt-metrics/internal/agent/grpcc"
 	"github.com/dsft54/rt-metrics/internal/agent/scheduller"
 	"github.com/dsft54/rt-metrics/internal/agent/storage"
 	"github.com/dsft54/rt-metrics/internal/cryptokey"
+	pb "github.com/dsft54/rt-metrics/proto"
 )
 
 // sendData собирает json в массив байт, и отправляет его при помощи resty.Client на
@@ -41,6 +45,7 @@ func sendData(url string, keyPath string, m interface{}, client *resty.Client) e
 	}
 	_, err = client.R().
 		SetHeader("Content-Type", "application/json").
+		SetHeader("X-Real-IP", "127.0.0.1").
 		SetBody(rawData).
 		Post(url)
 	return err
@@ -48,7 +53,7 @@ func sendData(url string, keyPath string, m interface{}, client *resty.Client) e
 
 // reportMetrics ожидает либо выхода по контексту, либо бродкаста на переменную состояния. Во втором
 // случае отправляет метрики на сервер либо штучно, либо списком.
-func reportMetrics(ctx context.Context, sch *scheduller.Scheduller, cfg *settings.Config, s *storage.MemStorage, wg *sync.WaitGroup) {
+func reportMetrics(ctx context.Context, sch *scheduller.Scheduller, cfg *settings.Config, s *storage.MemStorage, c pb.MetricClient, wg *sync.WaitGroup) {
 	defer wg.Done()
 	client := resty.New()
 	for {
@@ -74,12 +79,25 @@ func reportMetrics(ctx context.Context, sch *scheduller.Scheduller, cfg *setting
 							log.Println(err)
 							continue
 						}
+						if cfg.Grpc {
+							err := grpcc.SendMetric(ctx, c, value)
+							if err != nil {
+								log.Println(err)
+								continue
+							}
+						}
 					}
 				}
 			} else {
 				err := sendData("http://"+cfg.Address+"/updates", cfg.CryptoKey, &metricsSlice, client)
 				if err != nil {
 					log.Println(err)
+				}
+				if cfg.Grpc {
+					err := grpcc.SendMetrics(ctx, c, metricsSlice)
+					if err != nil {
+						log.Println(err)
+					}
 				}
 			}
 			log.Println("Atempted to report all metrics. Interval", cfg.ReportInterval)
@@ -128,22 +146,16 @@ func init() {
 	flag.DurationVar(&config.PollInterval, "p", 2*time.Second, "Runtime poll interval")
 	flag.DurationVar(&config.ReportInterval, "r", 10*time.Second, "Report metrics interval")
 	flag.BoolVar(&config.Batched, "b", true, "Batched metric report")
+	flag.BoolVar(&config.Grpc, "g", true, "Send metrics via grpc")
 	flag.StringVar(&config.HashKey, "k", "", "SHA256 signing key")
 	flag.StringVar(&config.CryptoKey, "crypto-key", "", "Path to public rsa key")
 	flag.StringVar(&config.Config, "c", "", "Path to json config file")
 }
 
-var (
-	config       settings.Config
-	buildVersion string = "N/A"
-	buildDate    string = "N/A"
-	buildCommit  string = "N/A"
-)
+var config       settings.Config
+
 
 func main() {
-	log.Println("Build version:", buildVersion)
-	log.Println("Build date:", buildDate)
-	log.Println("Build commit:", buildCommit)
 	flag.Parse()
 	err := env.Parse(&config)
 	if err != nil {
@@ -160,11 +172,22 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	wg.Add(4)
 
+	var c pb.MetricClient
+	if config.Grpc {
+		conn, err := grpc.Dial(":3200", grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer conn.Close()
+		c = pb.NewMetricClient(conn)
+		log.Println("Connection to grpc server established")
+	}
+
 	signal.Notify(syscallCancelChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	go sch.Start(ctx, wg)
 	go pollRuntimeMetrics(ctx, sch.Pc, ms, wg)
 	go pollPSUtilMetrics(ctx, sch.Pc, ms, wg)
-	go reportMetrics(ctx, sch, &config, ms, wg)
+	go reportMetrics(ctx, sch, &config, ms, c, wg)
 	sig := <-syscallCancelChan
 	log.Printf("Caught syscall: %v", sig)
 	cancel()

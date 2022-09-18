@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "rt-metrics/proto";
+
+message Metrics {
+  string id = 1;
+  string mtype = 2;
+  sint64 delta = 3;
+  double value = 4;
+  string hash = 5;
+}
+
+message AddMetricRequest {
+  Metrics metrics = 1;
+}
+
+message AddMetricResponse {
+  string error = 1;
+}
+
+message AddMetricsRequest {
+  repeated Metrics metrics = 1;
+}
+
+message AddMetricsResponse {
+  string error = 1;
+}
+
+service Metric {
+  rpc AddMetric(AddMetricRequest) returns (AddMetricResponse);
+  rpc AddMetrics(AddMetricsRequest) returns (AddMetricsResponse);
+}

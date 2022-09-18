@@ -143,6 +143,22 @@ func TestFileStorage_SaveStorageToFile(t *testing.T) {
 			wantInFile: "[{\"id\":\"Alloc\",\"type\":\"gauge\",\"value\":3.14},{\"id\":\"Counter\",\"type\":\"counter\",\"delta\":3}]",
 			wantErr:    false,
 		},
+		{
+			name: "Save memstorage",
+			f: &FileStorage{
+				FilePath: "test",
+			},
+			s: &MemoryStorage{
+				GaugeMetrics: map[string]float64{
+					"Alloc": 3.14,
+				},
+				CounterMetrics: map[string]int64{
+					"Counter": 3,
+				},
+			},
+			wantInFile: "[{\"id\":\"Alloc\",\"type\":\"gauge\",\"value\":3.14},{\"id\":\"Counter\",\"type\":\"counter\",\"delta\":3}]",
+			wantErr:    false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

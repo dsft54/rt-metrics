@@ -6,11 +6,12 @@ import (
 	"crypto/rsa"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	
+
 	"github.com/dsft54/rt-metrics/internal/cryptokey"
 )
 
@@ -91,4 +92,19 @@ func Decryption(private *rsa.PrivateKey, chunkSize int) gin.HandlerFunc {
 		c.Request.Body = io.NopCloser(bytes.NewBuffer(decryptedBody))
 		c.Next()
 	}
+}
+
+func NetFilter(allowedNetwork string) gin.HandlerFunc {
+    return func(c *gin.Context) {
+		_, sub, err := net.ParseCIDR(allowedNetwork)
+		if err != nil {
+			c.AbortWithStatus(http.StatusForbidden)
+            return
+		}
+		if !sub.Contains(net.ParseIP(c.Request.Header.Get("X-Real-IP"))) {
+            c.AbortWithStatus(http.StatusForbidden)
+            return
+        }
+		c.Next()
+    }
 }
