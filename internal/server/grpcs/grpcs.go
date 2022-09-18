@@ -4,6 +4,7 @@ package grpcs
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/dsft54/rt-metrics/internal/server/storage"
 	pb "github.com/dsft54/rt-metrics/proto"
@@ -24,11 +25,16 @@ func (ms *MetricsServer) AddMetric(ctx context.Context, in *pb.AddMetricRequest)
 		Value: &in.Metrics.Value,
 		Hash:  in.Metrics.Hash,
 	}
+	if ms.Storage == nil {
+		response.Error = fmt.Sprint("failed to set up storage: ", inM)
+		return &response, nil
+	}
 	err := ms.Storage.InsertMetric(inM)
 	if err != nil {
 		response.Error = fmt.Sprint("failed to add metric: ", inM)
 		return &response, err
 	}
+	log.Println("Successfully added metric via grpc ...")
 	return &response, nil
 }
 
@@ -45,10 +51,15 @@ func (ms *MetricsServer) AddMetrics(ctx context.Context, in *pb.AddMetricsReques
 		}
 		ainM = append(ainM, *inM)
 	}
+	if ms.Storage == nil {
+		response.Error = fmt.Sprint("failed to set up storage: ", ainM)
+		return &response, nil
+	}
 	err := ms.Storage.InsertBatchMetric(ainM)
 	if err != nil {
 		response.Error = fmt.Sprint("failed to add metric: ", ainM)
 		return &response, err
 	}
+	log.Println("Successfully added metrics via grpc ...")
 	return &response, nil
 }

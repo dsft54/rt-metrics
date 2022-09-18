@@ -10,14 +10,15 @@ import (
 
 // Config - структура описывающая основные настройки сервера. Принимает переменные окружения и флаги.
 type Config struct {
-	Address       string        `env:"ADDRESS" json:"address"`
-	StoreFile     string        `env:"STORE_FILE" json:"store_file"`
-	HashKey       string        `env:"KEY" json:"hash_key"`
-	DatabaseDSN   string        `env:"DATABASE_DSN" json:"database_dsn"`
-	CryptoKey     string        `env:"CRYPTO_KEY" json:"crypto_key"`
-	Config        string        `env:"CONFIG"`
-	TrustedSubnet string        `env:"TRUSTED_SUBNET" json:"trusted_subnet"`
-	Restore       bool          `env:"RESTORE" json:"restore"`
+	Address       string `env:"ADDRESS" json:"address"`
+	StoreFile     string `env:"STORE_FILE" json:"store_file"`
+	HashKey       string `env:"KEY" json:"hash_key"`
+	DatabaseDSN   string `env:"DATABASE_DSN" json:"database_dsn"`
+	CryptoKey     string `env:"CRYPTO_KEY" json:"crypto_key"`
+	Config        string `env:"CONFIG"`
+	TrustedSubnet string `env:"TRUSTED_SUBNET" json:"trusted_subnet"`
+	Restore       bool   `env:"RESTORE" json:"restore"`
+	Grpc          bool
 	StoreInterval time.Duration `env:"STORE_INTERVAL"`
 }
 

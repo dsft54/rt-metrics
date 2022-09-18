@@ -126,7 +126,7 @@ func Test_reportMetrics(t *testing.T) {
 				var cancel context.CancelFunc
 				tt.wg.Add(1)
 				tt.ctx, cancel = context.WithCancel(context.Background())
-				go reportMetrics(tt.ctx, tt.sch, tt.cfg, tt.s, tt.wg)
+				go reportMetrics(tt.ctx, tt.sch, tt.cfg, tt.s, nil, tt.wg)
 				cancel()
 				select {
 				case <-time.NewTimer(500 * time.Millisecond).C:
@@ -138,7 +138,7 @@ func Test_reportMetrics(t *testing.T) {
 				tt.ctx = context.Background()
 				tt.wg.Add(1)
 				tt.sch.Update = false
-				go reportMetrics(tt.ctx, tt.sch, tt.cfg, tt.s, tt.wg)
+				go reportMetrics(tt.ctx, tt.sch, tt.cfg, tt.s, nil, tt.wg)
 				<-time.NewTimer(500 * time.Millisecond).C
 				tt.sch.Rc.Broadcast()
 				select {
@@ -152,7 +152,7 @@ func Test_reportMetrics(t *testing.T) {
 				var cancel context.CancelFunc
 				tt.wg.Add(1)
 				tt.ctx, cancel = context.WithCancel(context.Background())
-				go reportMetrics(tt.ctx, tt.sch, tt.cfg, tt.s, tt.wg)
+				go reportMetrics(tt.ctx, tt.sch, tt.cfg, tt.s, nil, tt.wg)
 				<-time.NewTimer(1000 * time.Millisecond).C
 				tt.sch.Rc.Broadcast()
 				cancel()

@@ -4,7 +4,9 @@ import (
 	"compress/gzip"
 	"context"
 	"flag"
+	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,11 +17,14 @@ import (
 
 	"github.com/caarlos0/env"
 	"github.com/gin-gonic/gin"
+	"google.golang.org/grpc"
 
 	"github.com/dsft54/rt-metrics/config/server/settings"
 	"github.com/dsft54/rt-metrics/internal/cryptokey"
+	"github.com/dsft54/rt-metrics/internal/server/grpcs"
 	"github.com/dsft54/rt-metrics/internal/server/handlers"
 	"github.com/dsft54/rt-metrics/internal/server/storage"
+	pb "github.com/dsft54/rt-metrics/proto"
 )
 
 var config settings.Config
@@ -46,7 +51,7 @@ func initStorages(ctx context.Context, config settings.Config) (storage.IStorage
 }
 
 // setupGinRouter создает *gin.Engine определяя работу маршрутизатора и используемое middleware.
-func setupGinRouter(st storage.IStorage, fs *storage.FileStorage, keyPath, allowedNetwork string) *gin.Engine {
+func setupGinRouter(st storage.IStorage, fs *storage.FileStorage, keyPath, allowedNetwork string) (*gin.Engine, error) {
 	router := gin.New()
 	router.Use(
 		gin.Recovery(),
@@ -60,11 +65,11 @@ func setupGinRouter(st storage.IStorage, fs *storage.FileStorage, keyPath, allow
 	if keyPath != "" {
 		private, err := cryptokey.ParsePrivateKey(keyPath)
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 		pub, err := cryptokey.ParsePublicKey(keyPath + ".pub")
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 		chunkSize := pub.Size()
 		router.Use(
@@ -80,7 +85,7 @@ func setupGinRouter(st storage.IStorage, fs *storage.FileStorage, keyPath, allow
 	router.POST("/update/:type/:name/:value", handlers.ParametersUpdate(st, fs))
 	router.POST("/update/gauge/", handlers.WithoutID)
 	router.POST("/update/counter/", handlers.WithoutID)
-	return router
+	return router, nil
 }
 
 // init определяет используемые флаги командной строки для настройки запуска сервера.
@@ -93,19 +98,11 @@ func init() {
 	flag.StringVar(&config.Config, "c", "", "Path to json config file")
 	flag.StringVar(&config.HashKey, "k", "", "SHA256 signing key")
 	flag.BoolVar(&config.Restore, "r", true, "Restore metrics from file on start")
+	flag.BoolVar(&config.Grpc, "g", true, "Start up grpc server")
 	flag.DurationVar(&config.StoreInterval, "i", 300*time.Second, "Update file storage interval")
 }
 
-var (
-	buildVersion string = "N/A"
-	buildDate    string = "N/A"
-	buildCommit  string = "N/A"
-)
-
 func main() {
-	log.Println("Build version:", buildVersion)
-	log.Println("Build date:", buildDate)
-	log.Println("Build commit:", buildCommit)
 	// Init syscall channel, ctx, stores, parse flags and os vars
 	syscallCancelChan := make(chan os.Signal, 1)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -134,7 +131,10 @@ func main() {
 	}
 
 	// Start gin engine
-	router := setupGinRouter(st, fs, config.CryptoKey, config.TrustedSubnet)
+	router, err := setupGinRouter(st, fs, config.CryptoKey, config.TrustedSubnet)
+	if err != nil {
+		log.Fatal(err)
+	}
 	server := &http.Server{
 		Addr:    config.Address,
 		Handler: router,
@@ -145,6 +145,21 @@ func main() {
 			log.Println("Listen: ", err)
 		}
 	}()
+
+	// Start grpc server
+	if config.Grpc {
+		listen, err := net.Listen("tcp", ":3200")
+		if err != nil {
+			log.Fatal(err)
+		}
+		s := grpc.NewServer()
+		pb.RegisterMetricServer(s, &grpcs.MetricsServer{Storage: st})
+
+		fmt.Println("Сервер gRPC начал работу")
+		if err := s.Serve(listen); err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	// Wait and handle syscall exits
 	signal.Notify(syscallCancelChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)

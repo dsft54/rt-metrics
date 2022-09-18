@@ -15,11 +15,12 @@ import (
 )
 
 type Config struct {
-	Address        string        `env:"ADDRESS" json:"address"`
-	HashKey        string        `env:"ADDRESS" json:"hash_key"`
-	CryptoKey      string        `env:"CRYPTO_KEY" json:"crypto_key"`
-	Config         string        `env:"CONFIG"`
-	Batched        bool          `env:"BATCHED" json:"batched"`
+	Address        string `env:"ADDRESS" json:"address"`
+	HashKey        string `env:"ADDRESS" json:"hash_key"`
+	CryptoKey      string `env:"CRYPTO_KEY" json:"crypto_key"`
+	Config         string `env:"CONFIG"`
+	Batched        bool   `env:"BATCHED" json:"batched"`
+	Grpc           bool
 	PollInterval   time.Duration `env:"POLL_INTERVAL"`
 	ReportInterval time.Duration `env:"REPORT_INTERVAL"`
 }
